@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#f4f2ed" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0e0f13" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
@@ -52,7 +52,7 @@
         </label>
 
         <div class="field-label">Paid / received via</div>
-        <div class="seg" id="methodSeg">
+        <div class="seg sm" id="methodSeg">
           <button type="button" data-method="account" class="on">Account</button>
           <button type="button" data-method="cash">Cash</button>
         </div>
@@ -68,12 +68,30 @@
 
         <button id="saveBtn" type="button" class="save">Save expense</button>
       </div>
-
-      <div class="list-head"><h2 id="todayTitle">Recent entries</h2><span id="todaySum"></span></div>
-      <div id="todayList" class="card list"></div>
     </section>
 
-    <!-- ========== Page 2: Summary ========== -->
+
+    <!-- ========== Page 2: Recent ========== -->
+    <section id="page-recent" class="page" hidden>
+      <div id="recentList" class="card list"></div>
+      <button type="button" id="recentMore" class="ghost more" hidden>Show more</button>
+    </section>
+
+    <!-- ========== Page 4: Balance ========== -->
+    <section id="page-balance" class="page" hidden>
+      <div class="card bal-total">
+        <small>Total balance</small>
+        <b id="balTotal">฿0</b>
+        <span id="balSub"></span>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>Accounts &amp; cash</span><button type="button" id="balEdit" class="link">Set starting balance</button></div>
+        <div id="balList"></div>
+        <p class="hint" id="balHint"></p>
+      </div>
+    </section>
+
+    <!-- ========== Page 3: Summary ========== -->
     <section id="page-summary" class="page" hidden>
       <div class="seg range" id="rangeSeg">
         <button type="button" data-range="day" class="on">Day</button>
@@ -130,9 +148,17 @@
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
       <span>Add</span>
     </button>
+    <button type="button" data-page="recent">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span>Recent</span>
+    </button>
     <button type="button" data-page="summary">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
       <span>Summary</span>
+    </button>
+    <button type="button" data-page="balance">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l12-4v4"/><circle cx="16.5" cy="13.5" r="1.2"/></svg>
+      <span>Balance</span>
     </button>
   </nav>
 </div>
@@ -168,19 +194,17 @@
       </div>
 
       <h3>Customize lists</h3>
-      <p class="hint">One item per line. An emoji in front (e.g. 🍜 Food) is kept in your Google Sheet and shown next to entries, but not in the pickers.</p>
-      <label class="fld">Accounts
-        <textarea id="setAccounts" rows="4"></textarea>
-      </label>
-      <label class="fld">Expense categories
-        <textarea id="setExpense" rows="8"></textarea>
-      </label>
-      <label class="fld">Income categories
-        <textarea id="setIncome" rows="5"></textarea>
-      </label>
-      <label class="fld">Travel types
-        <textarea id="setTravel" rows="7"></textarea>
-      </label>
+      <p class="hint">Tap × to remove an item, or + Add new to add one. Emoji in your Google Sheet lists are kept and shown next to entries, never in the pickers.</p>
+      <div id="listEditors">
+      <div class="fld">Accounts</div>
+      <div class="chips edit" id="edAccounts" data-key="accounts"></div>
+      <div class="fld">Expense categories</div>
+      <div class="chips edit" id="edExpense" data-key="expense"></div>
+      <div class="fld">Income categories</div>
+      <div class="chips edit" id="edIncome" data-key="income"></div>
+      <div class="fld">Travel types</div>
+      <div class="chips edit" id="edTravel" data-key="travel"></div>
+      </div>
       <button type="button" id="resetLists" class="ghost">Reset lists to defaults</button>
     </div>
     <div class="sheet-foot"><button type="button" id="saveCfg" class="save">Save settings</button></div>

@@ -60,6 +60,7 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { touch-action: manipulation; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
 body {
   font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Sukhumvit Set", "Thonburi", "Noto Sans Thai", "Segoe UI", sans-serif;
@@ -138,6 +139,9 @@ input, textarea { font: inherit; color: inherit; }
 .seg:not(.ready) .thumb, .tabs:not(.ready) .thumb { transition: none; }
 .seg button { position: relative; z-index: 1; padding: 11px 6px; font-weight: 600; color: var(--muted); transition: color .2s; }
 .seg button.on { color: var(--text); }
+.seg.sm { width: 188px; padding: 3px; }
+.seg.sm .thumb { top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n, 2)); }
+.seg.sm button { padding: 6px 4px; font-size: 13px; }
 .mode-expense { --mode: var(--exp); }
 .mode-income  { --mode: var(--inc); }
 .mode-travel  { --mode: var(--trv); }
@@ -159,13 +163,13 @@ input, textarea { font: inherit; color: inherit; }
 #amountMirror { display: block; visibility: hidden; overflow: hidden; }
 .amt-wrap input { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: none; outline: 0; color: var(--mode); text-align: left; transition: color .25s; }
 .amt-wrap input::placeholder { color: var(--muted); opacity: .45; }
-.field-label { margin: 16px 2px 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.field-label { margin: 14px 2px 7px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chips:empty { display: none; }
 .chip {
   display: inline-flex; align-items: center;
-  padding: 10px 15px; border-radius: 99px; background: var(--chip);
-  font-size: 15px; border: 1px solid transparent; transition: .15s;
+  padding: 6px 12px; border-radius: 99px; background: var(--chip);
+  font-size: 13px; border: 1px solid transparent; transition: .15s;
 }
 .chip.on {
   font-weight: 600; color: var(--text);
@@ -175,7 +179,7 @@ input, textarea { font: inherit; color: inherit; }
   border-color: color-mix(in srgb, var(--mode) 55%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 3px 10px color-mix(in srgb, var(--mode) 22%, transparent);
 }
-#accountRow { margin-top: 10px; }
+#accountRow { margin-top: 8px; }
 .row2 { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 16px; }
 .row2 input {
   background: var(--chip); border: 0; border-radius: 16px; padding: 13px 15px; outline: 0; min-width: 0;
@@ -286,18 +290,18 @@ input, textarea { font: inherit; color: inherit; }
 /* ---------- floating glass tab bar ---------- */
 .tabs {
   position: fixed; z-index: 20; left: 50%; transform: translateX(-50%);
-  bottom: calc(14px + var(--safe-b)); width: min(360px, calc(100% - 40px));
-  display: grid; grid-template-columns: 1fr 1fr; padding: 6px; border-radius: 99px;
+  bottom: calc(14px + var(--safe-b)); width: min(420px, calc(100% - 28px));
+  display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px; border-radius: 99px;
 }
 .tabs .thumb {
-  position: absolute; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 12px) / 2); border-radius: 99px;
+  position: absolute; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 12px) / var(--n, 4)); border-radius: 99px;
   transform: translateX(calc(var(--i, 0) * 100%)); transition: transform .45s cubic-bezier(.3, 1.35, .5, 1);
   background: var(--g-fill-strong);
   background: linear-gradient(180deg, color-mix(in srgb, var(--trv) 24%, transparent), color-mix(in srgb, var(--trv) 10%, transparent)), var(--g-fill-strong);
   border: 1px solid var(--g-border);
   box-shadow: inset 0 1.5px 0 var(--g-hi), 0 4px 12px rgba(40, 36, 28, .12);
 }
-.tabs button { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 0 7px; color: var(--muted); font-size: 12px; font-weight: 600; transition: color .2s; }
+.tabs button { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 0 7px; color: var(--muted); font-size: 11px; font-weight: 600; transition: color .2s; }
 .tabs button.on { color: var(--trv); }
 
 /* ---------- settings sheet ---------- */
@@ -329,3 +333,28 @@ input, textarea { font: inherit; color: inherit; }
   font-weight: 600; font-size: 15px; opacity: 0; pointer-events: none; transition: .22s; z-index: 60; max-width: 90vw; text-align: center;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- recent / balance ---------- */
+.more { display: block; margin: 0 auto 14px; }
+.bal-total { text-align: center; padding: 22px 16px; }
+.bal-total small { display: block; color: var(--muted); font-size: 13px; font-weight: 600; }
+.bal-total b { display: block; font-size: 40px; letter-spacing: -1px; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+.bal-total b.neg { color: var(--exp); }
+.bal-total span { color: var(--muted); font-size: 13px; }
+.link { color: var(--trv); font-size: 14px; font-weight: 600; }
+.brow { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.brow:last-child { border-bottom: 0; }
+.brow .mid { flex: 1; min-width: 0; }
+.brow .t { font-weight: 600; }
+.brow .s { font-size: 12px; color: var(--muted); }
+.bv { font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; }
+.bv.neg { color: var(--exp); }
+.open-in { width: 128px; padding: 10px 12px; border: 0; outline: 0; border-radius: 14px; background: var(--chip); text-align: right; font-size: 16px; }
+
+/* ---------- settings list editor ---------- */
+.chips.edit { gap: 8px; }
+.chip.ed { padding: 0 4px 0 14px; gap: 2px; font-size: 14px; background: var(--card); box-shadow: var(--shadow); }
+.chip.ed button { width: 30px; height: 30px; border-radius: 50%; font-size: 19px; line-height: 1; color: var(--muted); }
+.chip.ed button:active { background: var(--chip); }
+.chip.add { padding: 7px 14px; font-size: 14px; color: var(--trv); background: none; border: 1px dashed color-mix(in srgb, var(--trv) 55%, transparent); font-weight: 600; }
+.chip-input { width: 150px; padding: 7px 14px; font-size: 16px; border: 1px solid var(--trv); outline: 0; background: var(--card); color: var(--text); }

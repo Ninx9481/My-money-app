@@ -96,7 +96,9 @@ const ui = {
   date: todayStr(),
   range: 'day',
   anchor: new Date(),
-  entriesOpen: LS.get('entriesOpen', false)
+  entriesOpen: LS.get('entriesOpen', false),
+  recentN: 50,
+  balEdit: false
 };
 
 const saveCfg = () => LS.set('cfg', cfg);
@@ -204,13 +206,6 @@ function renderEntry() {
   $('#date').value = ui.date;
   $('#setupBanner').hidden = !!cfg.url;
 
-  const mp = maps();
-  const recent = tx.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 8);
-  $('#todayTitle').textContent = 'Recent entries';
-  const t = todayStr();
-  const todayExp = tx.filter(x => x.date === t && x.type === 'expense').reduce((s, x) => s + x.amount, 0);
-  $('#todaySum').textContent = todayExp ? 'Spent today ' + baht(todayExp) : '';
-  $('#todayList').innerHTML = recent.length ? recent.map(x => itemHTML(x, mp, true)).join('') : '<div class="empty">No entries yet</div>';
 }
 
 function parseAmount(s) {
@@ -263,6 +258,84 @@ function removeTx(id) {
   saveTx(); saveQueue();
   render();
   toast('Deleted');
+  sync();
+}
+
+/* ================= recent page ================= */
+function renderRecent() {
+  const mp = maps();
+  const sorted = sortTx(tx);
+  const shown = sorted.slice(0, ui.recentN);
+  if (!shown.length) $('#recentList').innerHTML = '<div class="empty">No entries yet</div>';
+  else {
+    let html = '', cur = '';
+    shown.forEach(t => {
+      if (t.date !== cur) {
+        cur = t.date;
+        const dayExp = sum(sorted.filter(x => x.date === cur && x.type === 'expense'));
+        html += `<div class="dayhead"><span>${esc(dateLabel(cur))}</span><span>${dayExp ? 'Spent ' + baht(dayExp) : ''}</span></div>`;
+      }
+      html += itemHTML(t, mp, false);
+    });
+    $('#recentList').innerHTML = html;
+  }
+  $('#recentMore').hidden = sorted.length <= shown.length;
+}
+
+/* ================= balance page ================= */
+const CASH_KEY = '__cash__';
+const openingMap = () => (settings.opening && typeof settings.opening === 'object') ? settings.opening : {};
+function balances() {
+  const op = openingMap();
+  const rows = new Map();
+  const row = (key, name, editable) => { if (!rows.has(key)) rows.set(key, { key, name, editable, open: Number(op[key]) || 0, inc: 0, exp: 0 }); return rows.get(key); };
+  accountNames().forEach(n => row(n, n, true));
+  row(CASH_KEY, 'Cash', true);
+  tx.forEach(t => {
+    const r = t.method === 'cash' ? row(CASH_KEY, 'Cash', true) : row(tn(t.account) || 'Account', tn(t.account) || 'Account', false);
+    if (t.type === 'income') r.inc += t.amount; else r.exp += t.amount;
+  });
+  Object.keys(op).forEach(k => { if (Number(op[k]) && k !== CASH_KEY) row(k, k, false); });
+  const list = [...rows.values()].map(r => Object.assign(r, { bal: Math.round((r.open + r.inc - r.exp) * 100) / 100 }));
+  // keep the configured order; cash last; unknown/removed accounts after the accounts
+  const rank = r => r.key === CASH_KEY ? 2 : r.editable ? 0 : 1;
+  list.sort((a, b) => rank(a) - rank(b));
+  return list;
+}
+
+function renderBalance() {
+  const list = balances();
+  const total = Math.round(list.reduce((s, r) => s + r.bal, 0) * 100) / 100;
+  $('#balTotal').textContent = baht(total);
+  $('#balTotal').classList.toggle('neg', total < 0);
+  $('#balSub').textContent = list.length > 1 ? 'Across ' + list.length + ' places' : '';
+  $('#balEdit').textContent = ui.balEdit ? 'Done' : 'Set starting balance';
+  $('#balHint').textContent = ui.balEdit
+    ? 'Enter how much each account held before your first entry here. Balance = starting balance + income − expenses.'
+    : 'Balance = starting balance + all income − all expenses. Tap “Set starting balance” if you already had money in an account.';
+  $('#balList').innerHTML = list.map(r => {
+    const sub = r.editable || r.open ? '' : 'Not in your account list';
+    if (ui.balEdit && r.editable) {
+      return `<div class="brow"><div class="mid"><div class="t">${esc(r.name)}</div><div class="s">Starting balance</div></div>
+        <input class="open-in" type="text" inputmode="decimal" autocomplete="off" placeholder="0" data-open="${esc(r.key)}" value="${r.open || ''}" aria-label="Starting balance for ${esc(r.name)}"></div>`;
+    }
+    const detail = `In ${baht(r.inc)} · Out ${baht(r.exp)}` + (r.open ? ` · Start ${baht(r.open)}` : '');
+    return `<div class="brow"><div class="mid"><div class="t">${esc(r.name)}</div><div class="s">${esc(sub || detail)}</div></div>
+      <div class="bv${r.bal < 0 ? ' neg' : ''}">${baht(r.bal)}</div></div>`;
+  }).join('');
+}
+
+function commitOpening() {
+  const op = Object.assign({}, openingMap());
+  $$('#balList input[data-open]').forEach(i => {
+    const v = parseAmount(i.value);
+    if (v) op[i.dataset.open] = v; else delete op[i.dataset.open];
+  });
+  settings = Object.assign({}, settings, { opening: op });
+  saveSettingsLocal();
+  queue = queue.filter(o => o.op !== 'saveSettings');
+  queue.push({ op: 'saveSettings', settings });
+  saveQueue();
   sync();
 }
 
@@ -520,12 +593,25 @@ async function sync(manual) {
 }
 
 /* ================= settings sheet ================= */
-function fillLists(src) {
-  $('#setAccounts').value = src.accounts.join('\n');
-  $('#setExpense').value = src.expense.join('\n');
-  $('#setIncome').value = src.income.join('\n');
-  $('#setTravel').value = src.travel.join('\n');
+const LIST_KEYS = { accounts: '#edAccounts', expense: '#edExpense', income: '#edIncome', travel: '#edTravel' };
+let draft = {};
+const cloneLists = src => { const d = {}; Object.keys(LIST_KEYS).forEach(k => { d[k] = (src[k] || []).slice(); }); return d; };
+function renderEditor(key) {
+  $(LIST_KEYS[key]).innerHTML = draft[key].map((raw, i) =>
+    `<span class="chip ed"><span class="nm">${esc(parseItem(raw).name)}</span><button type="button" data-rm="${i}" aria-label="Remove ${esc(parseItem(raw).name)}">×</button></span>`
+  ).join('') + '<button type="button" class="chip add" data-add>+ Add new</button>';
 }
+const renderEditors = () => Object.keys(LIST_KEYS).forEach(renderEditor);
+function commitAdd(inp) {
+  if (inp.dataset.done) return;
+  inp.dataset.done = '1';
+  const key = inp.closest('[data-key]').dataset.key;
+  const v = inp.value.trim();
+  if (v && !draft[key].some(x => parseItem(x).name.toLowerCase() === parseItem(v).name.toLowerCase())) draft[key].push(v);
+  else if (v) toast('Already in the list');
+  renderEditor(key);
+}
+function fillLists(src) { draft = cloneLists(src); renderEditors(); }
 function openSettings() {
   $('#cfgUrl').value = cfg.url;
   $('#cfgKey').value = cfg.key;
@@ -540,7 +626,6 @@ function markSettingsSegs() {
   $$('#themeSeg button').forEach(b => b.classList.toggle('on', b.dataset.theme === cfg.theme));
   $$('#weekSeg button').forEach(b => b.classList.toggle('on', Number(b.dataset.ws) === cfg.weekStart));
 }
-const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean);
 
 async function testConn() {
   const url = $('#cfgUrl').value.trim(), key = $('#cfgKey').value;
@@ -561,12 +646,8 @@ function saveSettingsForm() {
   cfg.url = $('#cfgUrl').value.trim();
   cfg.key = $('#cfgKey').value;
   saveCfg();
-  settings = {
-    accounts: lines('#setAccounts'),
-    expense: lines('#setExpense'),
-    income: lines('#setIncome'),
-    travel: lines('#setTravel')
-  };
+  $$('.chip-input').forEach(commitAdd);
+  settings = Object.assign({}, settings, cloneLists(draft));
   saveSettingsLocal();
   queue = queue.filter(o => o.op !== 'saveSettings');
   queue.push({ op: 'saveSettings', settings });
@@ -579,17 +660,21 @@ function saveSettingsForm() {
 }
 
 /* ================= navigation / render ================= */
+const TITLES = { entry: 'Money', recent: 'Recent', summary: 'Summary', balance: 'Balance' };
 function showPage(name) {
   ui.page = name;
-  $('#page-entry').hidden = name !== 'entry';
-  $('#page-summary').hidden = name !== 'summary';
-  $('#pageTitle').textContent = name === 'entry' ? 'Money' : 'Summary';
+  Object.keys(TITLES).forEach(p => { $('#page-' + p).hidden = p !== name; });
+  $('#pageTitle').textContent = TITLES[name];
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.page === name));
+  if (name !== 'balance') ui.balEdit = false;
   window.scrollTo(0, 0);
   render();
 }
 function render() {
-  if (ui.page === 'entry') renderEntry(); else renderSummary();
+  if (ui.page === 'entry') renderEntry();
+  else if (ui.page === 'recent') renderRecent();
+  else if (ui.page === 'balance') renderBalance();
+  else renderSummary();
   if (!cfg.url) setSync('unset');
 }
 
@@ -653,6 +738,27 @@ $('#closeSheet').addEventListener('click', closeSettings);
 $('#sheetBg').addEventListener('click', closeSettings);
 $('#testBtn').addEventListener('click', testConn);
 $('#resetLists').addEventListener('click', () => { fillLists(DEFAULTS); toast('Defaults loaded — tap Save settings'); });
+$('#listEditors').addEventListener('click', e => {
+  const box = e.target.closest('[data-key]'); if (!box) return;
+  const key = box.dataset.key;
+  const rm = e.target.closest('[data-rm]');
+  if (rm) { draft[key].splice(Number(rm.dataset.rm), 1); renderEditor(key); return; }
+  const add = e.target.closest('[data-add]');
+  if (add) {
+    const inp = document.createElement('input');
+    inp.className = 'chip chip-input'; inp.type = 'text'; inp.placeholder = 'Name'; inp.enterKeyHint = 'done';
+    inp.autocomplete = 'off'; inp.setAttribute('aria-label', 'New item name');
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); inp.blur(); } });
+    inp.addEventListener('blur', () => commitAdd(inp));
+    add.replaceWith(inp); inp.focus();
+  }
+});
+$('#recentMore').addEventListener('click', () => { ui.recentN += 50; renderRecent(); });
+$('#balEdit').addEventListener('click', () => {
+  if (ui.balEdit) { commitOpening(); ui.balEdit = false; toast('Starting balances saved'); }
+  else ui.balEdit = true;
+  renderBalance();
+});
 $('#saveCfg').addEventListener('click', saveSettingsForm);
 $('#themeSeg').addEventListener('click', e => {
   const b = e.target.closest('button[data-theme]'); if (!b) return;
@@ -672,6 +778,16 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 window.addEventListener('online', () => sync());
+
+/* ================= no pinch / double-tap zoom ================= */
+['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+  const n = Date.now();
+  if (n - lastTouchEnd < 300 && !e.target.closest('input, textarea')) e.preventDefault();
+  lastTouchEnd = n;
+}, { passive: false });
 
 /* ================= sliding glass thumbs ================= */
 function syncSegs() {
