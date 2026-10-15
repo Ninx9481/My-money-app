@@ -175,7 +175,7 @@ const accountNames = () => settings.accounts.map(a => parseItem(a).name);
 
 function sizeAmount() {
   const a = $('#amount');
-  a.style.width = (a.value ? Math.max(1, a.value.length) : 4) + 'ch';   // empty → fits the "0.00" placeholder
+  a.style.width = ((a.value ? Math.max(1, a.value.length) : 4) + 0.7) + 'ch';   // empty → fits the "0.00" placeholder; +0.7 = slack so iOS never clips the last digit
 }
 
 function renderEntry() {
@@ -563,7 +563,7 @@ function showPage(name) {
   ui.page = name;
   $('#page-entry').hidden = name !== 'entry';
   $('#page-summary').hidden = name !== 'summary';
-  $('#pageTitle').textContent = name === 'entry' ? 'Add' : 'Summary';
+  $('#pageTitle').textContent = name === 'entry' ? 'Money' : 'Summary';
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.page === name));
   window.scrollTo(0, 0);
   render();
