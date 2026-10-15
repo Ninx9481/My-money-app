@@ -139,7 +139,7 @@ input, textarea { font: inherit; color: inherit; }
 .seg:not(.ready) .thumb, .tabs:not(.ready) .thumb { transition: none; }
 .seg button { position: relative; z-index: 1; padding: 11px 6px; font-weight: 600; color: var(--muted); transition: color .2s; }
 .seg button.on { color: var(--text); }
-.seg.sm { width: 188px; padding: 3px; }
+.seg.sm { padding: 3px; }
 .seg.sm .thumb { top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n, 2)); }
 .seg.sm button { padding: 6px 4px; font-size: 13px; }
 .mode-expense { --mode: var(--exp); }
