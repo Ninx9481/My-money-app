@@ -1,117 +1,118 @@
 <!doctype html>
-<html lang="th">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f2f3f7">
+<meta name="theme-color" content="#f6f3ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0f13" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="รายรับรายจ่าย">
+<meta name="apple-mobile-web-app-title" content="Money">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css">
-<title>รายรับรายจ่าย</title>
+<title>Money</title>
 </head>
 <body>
 <div id="app">
   <header class="top">
-    <h1 id="pageTitle">บันทึก</h1>
+    <h1 id="pageTitle">Add</h1>
     <div class="top-actions">
-      <button id="syncBtn" class="sync" type="button" aria-label="ซิงค์ข้อมูล"><i id="syncDot"></i><span id="syncText">—</span></button>
-      <button id="settingsBtn" class="icon-btn" type="button" aria-label="ตั้งค่า">
+      <button id="syncBtn" class="sync" type="button" aria-label="Sync data"><i id="syncDot"></i><span id="syncText">—</span></button>
+      <button id="settingsBtn" class="icon-btn" type="button" aria-label="Settings">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       </button>
     </div>
   </header>
 
   <main>
-    <!-- ========== หน้า 1: บันทึก ========== -->
+    <!-- ========== Page 1: Add ========== -->
     <section id="page-entry" class="page">
       <div id="setupBanner" class="banner" hidden>
-        <span>ยังไม่ได้เชื่อมต่อ Google Sheet — ข้อมูลจะเก็บในเครื่องไว้ก่อน</span>
-        <button type="button" id="setupBtn">ตั้งค่า</button>
+        <span>Not connected to Google Sheet yet — entries are saved on this device for now.</span>
+        <button type="button" id="setupBtn">Set up</button>
       </div>
 
       <div id="entryCard" class="card entry mode-expense">
         <div class="seg seg3" id="modeSeg" role="tablist">
-          <button type="button" data-mode="expense" class="on">รายจ่าย</button>
-          <button type="button" data-mode="income">รายรับ</button>
-          <button type="button" data-mode="travel">🚌 เดินทาง</button>
+          <button type="button" data-mode="expense" class="on">Expense</button>
+          <button type="button" data-mode="income">Income</button>
+          <button type="button" data-mode="travel">🚌 Travel</button>
         </div>
 
         <label class="amount">
           <span class="baht">฿</span>
-          <input id="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0" enterkeyhint="done">
+          <input id="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" enterkeyhint="done" aria-label="Amount">
         </label>
 
-        <div class="field-label">จ่าย/รับผ่าน</div>
+        <div class="field-label">Paid / received via</div>
         <div class="seg" id="methodSeg">
-          <button type="button" data-method="account" class="on">🏦 บัญชี</button>
-          <button type="button" data-method="cash">💵 เงินสด</button>
+          <button type="button" data-method="account" class="on">🏦 Account</button>
+          <button type="button" data-method="cash">💵 Cash</button>
         </div>
         <div id="accountRow" class="chips"></div>
 
-        <div class="field-label" id="catLabel">หมวดหมู่</div>
+        <div class="field-label" id="catLabel">Category</div>
         <div id="catChips" class="chips cats"></div>
 
         <div class="row2">
-          <input id="note" type="text" placeholder="โน้ต (ไม่บังคับ)" autocomplete="off" enterkeyhint="done">
-          <input id="date" type="date" aria-label="วันที่">
+          <input id="note" type="text" placeholder="Note (optional)" autocomplete="off" enterkeyhint="done">
+          <input id="date" type="date" aria-label="Date">
         </div>
 
-        <button id="saveBtn" type="button" class="save">บันทึกรายจ่าย</button>
+        <button id="saveBtn" type="button" class="save">Save expense</button>
       </div>
 
-      <div class="list-head"><h2 id="todayTitle">รายการวันนี้</h2><span id="todaySum"></span></div>
+      <div class="list-head"><h2 id="todayTitle">Recent entries</h2><span id="todaySum"></span></div>
       <div id="todayList" class="card list"></div>
     </section>
 
-    <!-- ========== หน้า 2: สรุป ========== -->
+    <!-- ========== Page 2: Summary ========== -->
     <section id="page-summary" class="page" hidden>
       <div class="seg seg3 range" id="rangeSeg">
-        <button type="button" data-range="day" class="on">รายวัน</button>
-        <button type="button" data-range="week">รายสัปดาห์</button>
-        <button type="button" data-range="year">รายปี</button>
+        <button type="button" data-range="day" class="on">Day</button>
+        <button type="button" data-range="week">Week</button>
+        <button type="button" data-range="year">Year</button>
       </div>
 
       <div class="nav">
-        <button type="button" id="prevBtn" class="icon-btn" aria-label="ก่อนหน้า">‹</button>
+        <button type="button" id="prevBtn" class="icon-btn" aria-label="Previous">‹</button>
         <button type="button" id="periodLabel" class="period">—</button>
-        <button type="button" id="nextBtn" class="icon-btn" aria-label="ถัดไป">›</button>
+        <button type="button" id="nextBtn" class="icon-btn" aria-label="Next">›</button>
       </div>
 
       <div class="totals">
-        <div class="tot inc"><small>รายรับ</small><b id="sumInc">0</b></div>
-        <div class="tot exp"><small>รายจ่าย</small><b id="sumExp">0</b></div>
-        <div class="tot net"><small>คงเหลือ</small><b id="sumNet">0</b></div>
+        <div class="tot inc"><small>Income</small><b id="sumInc">0</b></div>
+        <div class="tot exp"><small>Expenses</small><b id="sumExp">0</b></div>
+        <div class="tot net"><small>Balance</small><b id="sumNet">0</b></div>
       </div>
 
       <div class="card" id="chartCard" hidden>
-        <h3 id="chartTitle">รายจ่าย</h3>
+        <h3 id="chartTitle">Overview</h3>
         <div id="chart" class="chart"></div>
-        <div class="legend"><span><i class="d exp"></i>รายจ่าย</span><span><i class="d inc"></i>รายรับ</span></div>
+        <div class="legend"><span><i class="d exp"></i>Expenses</span><span><i class="d inc"></i>Income</span></div>
       </div>
 
       <div class="card" id="splitCard">
-        <h3>รายจ่ายแยกตามวิธีจ่าย</h3>
+        <h3>Expenses by payment method</h3>
         <div id="splitList"></div>
       </div>
 
       <div class="card" id="catCard">
-        <h3>รายจ่ายแยกตามหมวด</h3>
+        <h3>Expenses by category</h3>
         <div id="catList"></div>
       </div>
 
       <div class="card" id="travelCard" hidden>
-        <h3>🚌 ค่าเดินทาง <b id="travelTotal" class="trv-total"></b></h3>
+        <h3>🚌 Travel <b id="travelTotal" class="trv-total"></b></h3>
         <div id="travelList"></div>
       </div>
 
       <div class="card" id="detailCard">
-        <h3 id="detailTitle">รายการ</h3>
+        <h3 id="detailTitle">Entries</h3>
         <div id="detailList" class="list"></div>
       </div>
     </section>
@@ -120,60 +121,62 @@
   <nav class="tabs">
     <button type="button" data-page="entry" class="on">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-      <span>บันทึก</span>
+      <span>Add</span>
     </button>
     <button type="button" data-page="summary">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
-      <span>สรุป</span>
+      <span>Summary</span>
     </button>
   </nav>
 </div>
 
-<!-- ========== ตั้งค่า ========== -->
+<!-- ========== Settings ========== -->
 <div id="sheet" class="sheet" hidden>
   <div class="sheet-bg" id="sheetBg"></div>
-  <div class="sheet-body" role="dialog" aria-label="ตั้งค่า">
-    <div class="sheet-head"><h2>ตั้งค่า</h2><button type="button" id="closeSheet" class="icon-btn" aria-label="ปิด">✕</button></div>
+  <div class="sheet-body" role="dialog" aria-label="Settings">
+    <div class="sheet-head"><h2>Settings</h2><button type="button" id="closeSheet" class="icon-btn" aria-label="Close">✕</button></div>
     <div class="sheet-scroll">
-      <h3>เชื่อมต่อ Google Sheet</h3>
-      <label class="fld">Web app URL (ลงท้ายด้วย /exec)
+      <h3>Connect Google Sheet</h3>
+      <label class="fld">Web app URL (ends with /exec)
         <input id="cfgUrl" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/.../exec">
       </label>
-      <label class="fld">รหัสลับ (SECRET)
-        <input id="cfgKey" type="password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="รหัสเดียวกับใน Code.gs">
+      <label class="fld">Secret key
+        <input id="cfgKey" type="password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Same as SECRET in Code.gs">
       </label>
-      <button type="button" id="testBtn" class="ghost">ทดสอบการเชื่อมต่อ</button>
+      <button type="button" id="testBtn" class="ghost">Test connection</button>
       <p id="testMsg" class="hint"></p>
 
-      <h3>การแสดงผล</h3>
-      <div class="fld">ธีม</div>
+      <h3>Appearance</h3>
+      <div class="fld">Theme</div>
       <div class="seg seg3" id="themeSeg">
-        <button type="button" data-theme="auto">ตามเครื่อง</button>
-        <button type="button" data-theme="light">สว่าง</button>
-        <button type="button" data-theme="dark">มืด</button>
+        <button type="button" data-theme="auto">Auto</button>
+        <button type="button" data-theme="light">Light</button>
+        <button type="button" data-theme="dark">Dark</button>
       </div>
-      <div class="fld">สัปดาห์เริ่มต้นวัน</div>
+      <p class="hint">Auto follows your iPhone. The iPhone status bar (clock, battery) always follows the iPhone's own appearance, so Auto keeps everything in sync.</p>
+      <div class="fld">Week starts on</div>
       <div class="seg" id="weekSeg">
-        <button type="button" data-ws="1">จันทร์</button>
-        <button type="button" data-ws="0">อาทิตย์</button>
+        <button type="button" data-ws="1">Monday</button>
+        <button type="button" data-ws="0">Sunday</button>
       </div>
 
-      <h3>รายการที่ปรับแก้ได้</h3>
-      <p class="hint">บรรทัดละ 1 รายการ พิมพ์อีโมจิไว้หน้าชื่อได้ เช่น 🍜 อาหาร</p>
-      <label class="fld">บัญชี
+      <h3>Customize lists</h3>
+      <p class="hint">One item per line. You can put an emoji in front, e.g. 🍜 Food</p>
+      <label class="fld">Accounts
         <textarea id="setAccounts" rows="4"></textarea>
       </label>
-      <label class="fld">หมวดรายจ่าย
+      <label class="fld">Expense categories
         <textarea id="setExpense" rows="8"></textarea>
       </label>
-      <label class="fld">หมวดรายรับ
+      <label class="fld">Income categories
         <textarea id="setIncome" rows="5"></textarea>
       </label>
-      <label class="fld">ประเภทค่าเดินทาง
+      <label class="fld">Travel types
         <textarea id="setTravel" rows="7"></textarea>
       </label>
+      <button type="button" id="resetLists" class="ghost">Reset lists to defaults</button>
     </div>
-    <div class="sheet-foot"><button type="button" id="saveCfg" class="save">บันทึกการตั้งค่า</button></div>
+    <div class="sheet-foot"><button type="button" id="saveCfg" class="save">Save settings</button></div>
   </div>
 </div>
 

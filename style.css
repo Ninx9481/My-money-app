@@ -1,15 +1,15 @@
 :root {
-  --bg: #f2f3f7;
-  --card: #ffffff;
-  --text: #16181d;
-  --muted: #6b7280;
-  --line: #e6e8ee;
-  --chip: #eef0f5;
+  --bg: #f6f3ea;
+  --card: #fffdf8;
+  --text: #1d1b16;
+  --muted: #766f64;
+  --line: #e7e1d3;
+  --chip: #efeadd;
   --exp: #e5484d;
   --inc: #16a34a;
   --trv: #2f6fed;
   --mode: var(--exp);
-  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 6px 20px rgba(16, 24, 40, .05);
+  --shadow: 0 1px 2px rgba(60, 48, 20, .06), 0 6px 20px rgba(60, 48, 20, .05);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
   color-scheme: light;
@@ -104,7 +104,7 @@ input, textarea { font: inherit; color: inherit; }
   width: 1ch; min-width: 1ch; max-width: 70vw; border: 0; background: none; outline: 0;
   font-size: 52px; font-weight: 700; text-align: left; letter-spacing: -1px; color: var(--mode);
 }
-.amount input::placeholder { color: var(--line); }
+.amount input::placeholder { color: var(--muted); opacity: .45; }
 .field-label { margin: 16px 2px 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chips:empty { display: none; }

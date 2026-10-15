@@ -6,7 +6,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const LS = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* โหมดส่วนตัว/เต็ม */ } }
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode / full */ } }
 };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -20,22 +20,20 @@ const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new D
 const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const todayStr = () => ymd(new Date());
 
-const F_FULL = new Intl.DateTimeFormat('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-const F_DM = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short' });
-const F_M = new Intl.DateTimeFormat('th-TH', { month: 'short' });
-const F_W = new Intl.DateTimeFormat('th-TH', { weekday: 'short' });
-const _FY = new Intl.DateTimeFormat('th-TH', { year: 'numeric' });
-const F_Y = { format: d => _FY.format(d).replace(/^พ\.ศ\.\s*/, '') };
+const F_FULL = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+const F_DM = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+const F_M = new Intl.DateTimeFormat('en-GB', { month: 'short' });
+const F_W = new Intl.DateTimeFormat('en-GB', { weekday: 'short' });
+const F_Y = new Intl.DateTimeFormat('en-GB', { year: 'numeric' });
 
 function dateLabel(s) {
-  const t = todayStr();
-  if (s === t) return 'วันนี้';
-  if (s === ymd(addDays(new Date(), -1))) return 'เมื่อวาน';
+  if (s === todayStr()) return 'Today';
+  if (s === ymd(addDays(new Date(), -1))) return 'Yesterday';
   const d = parseYmd(s);
   return F_DM.format(d) + (d.getFullYear() !== new Date().getFullYear() ? ' ' + F_Y.format(d) : '');
 }
 
-const EMO = /^(\p{Extended_Pictographic}[\p{Extended_Pictographic}\uFE0F\u200D\p{Emoji_Modifier}]*)\s*(.*)$/u;
+const EMO = /^(\p{Extended_Pictographic}[\p{Extended_Pictographic}️‍\p{Emoji_Modifier}]*)\s*(.*)$/u;
 function parseItem(s) {
   s = String(s).trim();
   const m = s.match(EMO);
@@ -43,14 +41,46 @@ function parseItem(s) {
   return { icon: '', name: s };
 }
 
-/* ================= state ================= */
+/* ================= constants / defaults ================= */
+const TRAVEL = 'Travel';
+const NONE = 'Uncategorized';
+
 const DEFAULTS = {
+  accounts: ['Main account', 'Second account'],
+  expense: ['🍜 Food', '☕ Coffee & drinks', '🛒 Groceries', '🏠 Rent & housing', '💡 Bills & internet', '🛍️ Shopping', '💊 Health', '🎬 Entertainment', '🎁 Gifts & donations', '📚 Education', '🧾 Other'],
+  income: ['💼 Salary', '🧑‍💻 Side income', '🎁 Gifts received', '📈 Interest & investments', '💰 Other'],
+  travel: ['🚇 BTS/MRT', '🚕 Taxi/Grab', '🏍️ Motorcycle taxi', '🚌 Bus/Songthaew', '⛽ Fuel', '🛣️ Tolls & parking', '🧳 Other']
+};
+
+// The first (Thai) version of the app saved these default lists to the sheet.
+// If a list is still exactly the old default, it is swapped for the English one.
+const LEGACY_DEFAULTS = {
   accounts: ['บัญชีหลัก', 'บัญชีรอง'],
   expense: ['🍜 อาหาร', '☕ กาแฟ/เครื่องดื่ม', '🛒 ของใช้', '🏠 ที่พัก/ค่าเช่า', '💡 ค่าน้ำ/ไฟ/เน็ต', '🛍️ ช้อปปิ้ง', '💊 สุขภาพ', '🎬 บันเทิง', '🎁 ของขวัญ/ทำบุญ', '📚 การเรียน', '🧾 อื่นๆ'],
   income: ['💼 เงินเดือน', '🧑‍💻 งานเสริม', '🎁 ได้รับ/ของขวัญ', '📈 ดอกเบี้ย/ลงทุน', '💰 อื่นๆ'],
   travel: ['🚇 BTS/MRT', '🚕 แท็กซี่/แกร็บ', '🏍️ วินมอไซค์', '🚌 รถเมล์/สองแถว', '⛽ น้ำมัน', '🛣️ ทางด่วน/ที่จอดรถ', '🧳 อื่นๆ']
 };
+// Old entries saved with Thai default names are displayed in English.
+const LEGACY_NAMES = {
+  'อาหาร': 'Food', 'กาแฟ/เครื่องดื่ม': 'Coffee & drinks', 'ของใช้': 'Groceries', 'ที่พัก/ค่าเช่า': 'Rent & housing',
+  'ค่าน้ำ/ไฟ/เน็ต': 'Bills & internet', 'ช้อปปิ้ง': 'Shopping', 'สุขภาพ': 'Health', 'บันเทิง': 'Entertainment',
+  'ของขวัญ/ทำบุญ': 'Gifts & donations', 'การเรียน': 'Education', 'อื่นๆ': 'Other',
+  'เงินเดือน': 'Salary', 'งานเสริม': 'Side income', 'ได้รับ/ของขวัญ': 'Gifts received', 'ดอกเบี้ย/ลงทุน': 'Interest & investments',
+  'แท็กซี่/แกร็บ': 'Taxi/Grab', 'วินมอไซค์': 'Motorcycle taxi', 'รถเมล์/สองแถว': 'Bus/Songthaew', 'น้ำมัน': 'Fuel', 'ทางด่วน/ที่จอดรถ': 'Tolls & parking',
+  'เดินทาง': TRAVEL, 'ไม่ระบุ': NONE, 'เงินสด': 'Cash', 'บัญชีหลัก': 'Main account', 'บัญชีรอง': 'Second account', 'บัญชี': 'Account'
+};
+const tn = name => LEGACY_NAMES[name] || name;
 
+function migrate(s) {
+  let changed = false;
+  const out = Object.assign({}, s);
+  Object.keys(LEGACY_DEFAULTS).forEach(k => {
+    if (JSON.stringify(out[k]) === JSON.stringify(LEGACY_DEFAULTS[k])) { out[k] = DEFAULTS[k].slice(); changed = true; }
+  });
+  return { s: out, changed };
+}
+
+/* ================= state ================= */
 let cfg = Object.assign({ url: '', key: '', theme: 'auto', weekStart: 1 }, LS.get('cfg', {}));
 let settings = Object.assign({}, DEFAULTS, LS.get('settings', {}));
 let tx = LS.get('tx', []);
@@ -73,13 +103,30 @@ const saveSettingsLocal = () => LS.set('settings', settings);
 const saveTx = () => LS.set('tx', tx);
 const saveQueue = () => LS.set('queue', queue);
 
+{ // one-time migration of old Thai defaults
+  const m = migrate(settings);
+  if (m.changed) {
+    settings = m.s; saveSettingsLocal();
+    queue = queue.filter(o => o.op !== 'saveSettings');
+    queue.push({ op: 'saveSettings', settings }); saveQueue();
+  }
+}
+
 /* ================= theme ================= */
+const COLORS = { light: '#f6f3ea', dark: '#0e0f13' };
 function applyTheme() {
   const r = document.documentElement;
   if (cfg.theme === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', cfg.theme);
-  const dark = cfg.theme === 'dark' || (cfg.theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
-  const m = $('meta[name="theme-color"]');
-  if (m) m.setAttribute('content', dark ? '#0e0f13' : '#f2f3f7');
+  $$('meta[name="theme-color"]').forEach(m => {
+    if (m.dataset.media === undefined) m.dataset.media = m.getAttribute('media') || '';
+    if (cfg.theme === 'auto') {
+      m.setAttribute('media', m.dataset.media);
+      m.setAttribute('content', m.dataset.media.includes('dark') ? COLORS.dark : COLORS.light);
+    } else {
+      m.setAttribute('media', 'all');
+      m.setAttribute('content', COLORS[cfg.theme]);
+    }
+  });
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyTheme);
 
@@ -95,26 +142,28 @@ function toast(msg) {
 
 /* ================= icon maps ================= */
 function maps() {
-  const mk = list => { const m = {}; list.forEach(s => { const p = parseItem(s); m[p.name] = p.icon; }); return m; };
-  return { expense: mk(settings.expense), income: mk(settings.income), travel: mk(settings.travel) };
+  const mk = (list, fallback) => { const m = {}; list.forEach(s => { const p = parseItem(s); m[p.name] = p.icon || fallback || ''; }); return m; };
+  return { expense: mk(settings.expense), income: mk(settings.income), travel: mk(settings.travel), accounts: mk(settings.accounts, '🏦') };
 }
+const ic = (map, raw) => map[raw] || map[tn(raw)] || '';
+const acctIcon = (mp, name) => ic(mp.accounts, name) || '🏦';
 
 function itemInfo(t, mp) {
-  if (t.travel) return { icon: mp.travel[t.sub] || '🚌', title: t.sub || 'เดินทาง' };
-  if (t.type === 'income') return { icon: mp.income[t.category] || '💰', title: t.category || 'รายรับ' };
-  return { icon: mp.expense[t.category] || (t.category === 'เดินทาง' ? '🚌' : '🏷️'), title: t.category || 'ไม่ระบุ' };
+  if (t.travel) return { icon: ic(mp.travel, t.sub) || '🚌', title: tn(t.sub) || TRAVEL };
+  if (t.type === 'income') return { icon: ic(mp.income, t.category) || '💰', title: tn(t.category) || 'Income' };
+  return { icon: ic(mp.expense, t.category) || (tn(t.category) === TRAVEL ? '🚌' : '🏷️'), title: tn(t.category) || NONE };
 }
 
 function itemHTML(t, mp, showDate) {
   const info = itemInfo(t, mp);
-  const way = t.method === 'cash' ? '💵 เงินสด' : '🏦 ' + (t.account || 'บัญชี');
+  const way = t.method === 'cash' ? '💵 Cash' : acctIcon(mp, t.account) + ' ' + (tn(t.account) || 'Account');
   const sub = [showDate ? dateLabel(t.date) : '', way, t.note].filter(Boolean).map(esc).join(' · ');
   const sign = t.type === 'income' ? '+' : '−';
   return `<div class="item">
     <div class="ico">${esc(info.icon)}</div>
     <div class="mid"><div class="t">${esc(info.title)}</div><div class="s">${sub}</div></div>
     <div class="amt ${t.type}">${sign}${money(t.amount)}</div>
-    <button class="del" type="button" data-del="${esc(t.id)}" aria-label="ลบ">✕</button>
+    <button class="del" type="button" data-del="${esc(t.id)}" aria-label="Delete">✕</button>
   </div>`;
 }
 
@@ -122,38 +171,45 @@ const sortTx = arr => arr.slice().sort((a, b) => (b.date.localeCompare(a.date)) 
 
 /* ================= entry page ================= */
 function listFor(mode) { return mode === 'income' ? settings.income : mode === 'travel' ? settings.travel : settings.expense; }
+const accountNames = () => settings.accounts.map(a => parseItem(a).name);
+
+function sizeAmount() {
+  const a = $('#amount');
+  a.style.width = (a.value ? Math.max(1, a.value.length) : 4) + 'ch';   // empty → fits the "0.00" placeholder
+}
 
 function renderEntry() {
   $('#entryCard').className = 'card entry mode-' + ui.mode;
   $$('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === ui.mode));
   $$('#methodSeg button').forEach(b => b.classList.toggle('on', b.dataset.method === ui.method));
 
-  if (!settings.accounts.includes(ui.account)) ui.account = settings.accounts[0] || '';
+  const names = accountNames();
+  if (!names.includes(ui.account)) ui.account = names[0] || '';
   const accRow = $('#accountRow');
   if (ui.method === 'account' && settings.accounts.length > 1) {
     accRow.innerHTML = settings.accounts.map((a, i) => {
       const p = parseItem(a);
-      return `<button type="button" class="chip${a === ui.account ? ' on' : ''}" data-acc="${i}">${esc((p.icon ? p.icon + ' ' : '') + p.name)}</button>`;
+      return `<button type="button" class="chip${p.name === ui.account ? ' on' : ''}" data-acc="${i}">${esc((p.icon ? p.icon + ' ' : '') + p.name)}</button>`;
     }).join('');
   } else accRow.innerHTML = '';
 
-  $('#catLabel').textContent = ui.mode === 'travel' ? 'ประเภทการเดินทาง' : 'หมวดหมู่';
+  $('#catLabel').textContent = ui.mode === 'travel' ? 'Travel type' : 'Category';
   $('#catChips').innerHTML = listFor(ui.mode).map((c, i) => {
     const p = parseItem(c);
     return `<button type="button" class="chip${p.name === ui.category ? ' on' : ''}" data-cat="${i}">${esc((p.icon ? p.icon + ' ' : '') + p.name)}</button>`;
   }).join('');
 
-  $('#saveBtn').textContent = ui.mode === 'income' ? 'บันทึกรายรับ' : ui.mode === 'travel' ? 'บันทึกค่าเดินทาง' : 'บันทึกรายจ่าย';
+  $('#saveBtn').textContent = ui.mode === 'income' ? 'Save income' : ui.mode === 'travel' ? 'Save travel' : 'Save expense';
   $('#date').value = ui.date;
   $('#setupBanner').hidden = !!cfg.url;
 
   const mp = maps();
   const recent = tx.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 8);
-  $('#todayTitle').textContent = 'บันทึกล่าสุด';
+  $('#todayTitle').textContent = 'Recent entries';
   const t = todayStr();
   const todayExp = tx.filter(x => x.date === t && x.type === 'expense').reduce((s, x) => s + x.amount, 0);
-  $('#todaySum').textContent = todayExp ? 'จ่ายวันนี้ ' + baht(todayExp) : '';
-  $('#todayList').innerHTML = recent.length ? recent.map(x => itemHTML(x, mp, true)).join('') : '<div class="empty">ยังไม่มีรายการ</div>';
+  $('#todaySum').textContent = todayExp ? 'Spent today ' + baht(todayExp) : '';
+  $('#todayList').innerHTML = recent.length ? recent.map(x => itemHTML(x, mp, true)).join('') : '<div class="empty">No entries yet</div>';
 }
 
 function parseAmount(s) {
@@ -163,7 +219,7 @@ function parseAmount(s) {
 
 function addEntry() {
   const amt = parseAmount($('#amount').value);
-  if (!(amt > 0)) { toast('ใส่จำนวนเงินก่อนนะ'); $('#amount').focus(); return; }
+  if (!(amt > 0)) { toast('Enter an amount first'); $('#amount').focus(); return; }
   const travel = ui.mode === 'travel';
   const t = {
     id: uid(),
@@ -172,7 +228,7 @@ function addEntry() {
     amount: amt,
     method: ui.method,
     account: ui.method === 'account' ? ui.account : '',
-    category: travel ? 'เดินทาง' : (ui.category || 'ไม่ระบุ'),
+    category: travel ? TRAVEL : (ui.category || NONE),
     sub: travel ? ui.category : '',
     note: $('#note').value.trim(),
     travel: travel ? 1 : 0,
@@ -190,21 +246,22 @@ function addEntry() {
   ui.category = '';
   ui.date = todayStr();
   renderEntry();
-  toast('✓ บันทึกแล้ว ' + baht(amt));
+  toast('✓ Saved ' + baht(amt));
   sync();
 }
 
 function removeTx(id) {
   const t = tx.find(x => x.id === id);
   if (!t) return;
-  if (!confirm(`ลบรายการนี้?\n${t.type === 'income' ? '+' : '−'}${money(t.amount)} · ${t.travel ? (t.sub || 'เดินทาง') : t.category}`)) return;
+  const label = t.travel ? (tn(t.sub) || TRAVEL) : tn(t.category);
+  if (!confirm(`Delete this entry?\n${t.type === 'income' ? '+' : '−'}${money(t.amount)} · ${label}`)) return;
   tx = tx.filter(x => x.id !== id);
   const i = queue.findIndex(o => o.op === 'add' && o.tx.id === id);
   if (i >= 0 && queue[i] !== inflight) queue.splice(i, 1);
   else queue.push({ op: 'delete', id });
   saveTx(); saveQueue();
   render();
-  toast('ลบแล้ว');
+  toast('Deleted');
   sync();
 }
 
@@ -221,16 +278,13 @@ function periodOf(range, anchor) {
 }
 
 function periodLabel(range, p) {
-  if (range === 'day') {
-    const d = parseYmd(p.s);
-    return (p.s === todayStr() ? 'วันนี้ · ' : '') + F_FULL.format(d);
-  }
+  if (range === 'day') return (p.s === todayStr() ? 'Today · ' : '') + F_FULL.format(parseYmd(p.s));
   if (range === 'week') {
     const a = parseYmd(p.s), b = parseYmd(p.e);
     const left = a.getMonth() === b.getMonth() ? String(a.getDate()) : F_DM.format(a);
     return `${left} – ${F_DM.format(b)} ${F_Y.format(b)}`;
   }
-  return 'ปี ' + F_Y.format(parseYmd(p.s));
+  return String(p.y);
 }
 
 function shiftAnchor(dir) {
@@ -248,7 +302,7 @@ function groupSum(arr, keyFn) {
 }
 
 function brkHTML(rows, total, cls) {
-  if (!rows.length) return '<div class="empty">ไม่มีข้อมูล</div>';
+  if (!rows.length) return '<div class="empty">No data</div>';
   return rows.map(([name, v, icon]) => {
     const pct = total ? Math.round(v / total * 100) : 0;
     return `<div class="brk"><div class="h"><span>${esc(icon ? icon + ' ' : '')}${esc(name)}<em>${pct}%</em></span><span>${baht(v)}</span></div>
@@ -271,7 +325,7 @@ function renderSummary() {
   $('#sumNet').textContent = baht(net);
   $('.tot.net').classList.toggle('neg', net < 0);
 
-  /* chart (สัปดาห์ / ปี) */
+  /* chart (week / year) */
   const chartCard = $('#chartCard');
   if (ui.range === 'day') chartCard.hidden = true;
   else {
@@ -284,7 +338,7 @@ function renderSummary() {
         return { label: F_W.format(d), cur: k === t,
           e: sum(exp.filter(x => x.date === k)), i: sum(inc.filter(x => x.date === k)) };
       });
-      $('#chartTitle').textContent = 'รายวันในสัปดาห์นี้';
+      $('#chartTitle').textContent = 'Daily this week';
     } else {
       buckets = Array.from({ length: 12 }, (_, m) => {
         const pre = `${p.y}-${pad(m + 1)}`;
@@ -292,7 +346,7 @@ function renderSummary() {
         return { label: F_M.format(new Date(p.y, m, 1)), cur: now.getFullYear() === p.y && now.getMonth() === m,
           e: sum(exp.filter(x => x.date.startsWith(pre))), i: sum(inc.filter(x => x.date.startsWith(pre))) };
       });
-      $('#chartTitle').textContent = 'รายเดือนในปีนี้';
+      $('#chartTitle').textContent = 'Monthly this year';
     }
     const max = Math.max(1, ...buckets.map(b => Math.max(b.e, b.i)));
     $('#chart').innerHTML = buckets.map(b => `<div class="col${b.cur ? ' cur' : ''}">
@@ -300,33 +354,33 @@ function renderSummary() {
       <div class="lb">${esc(b.label)}</div></div>`).join('');
   }
 
-  /* แยกตามวิธีจ่าย / หมวด / เดินทาง */
+  /* by payment method / category / travel */
   const has = exp.length > 0;
   $('#splitCard').hidden = !has;
   $('#catCard').hidden = !has;
   const travel = exp.filter(t => t.travel);
   $('#travelCard').hidden = !travel.length;
   if (has) {
-    const split = groupSum(exp, t => t.method === 'cash' ? 'เงินสด' : (t.account || 'บัญชี'))
-      .map(([k, v]) => [k, v, k === 'เงินสด' ? '💵' : '🏦']);
+    const split = groupSum(exp, t => t.method === 'cash' ? 'Cash' : (tn(t.account) || 'Account'))
+      .map(([k, v]) => [k, v, k === 'Cash' ? '💵' : acctIcon(mp, k)]);
     $('#splitList').innerHTML = brkHTML(split, expSum, 'acc');
-    const cats = groupSum(exp, t => t.travel ? 'เดินทาง' : (t.category || 'ไม่ระบุ'))
-      .map(([k, v]) => [k, v, k === 'เดินทาง' ? '🚌' : (mp.expense[k] || '🏷️')]);
+    const cats = groupSum(exp, t => t.travel ? TRAVEL : (tn(t.category) || NONE))
+      .map(([k, v]) => [k, v, k === TRAVEL ? '🚌' : (ic(mp.expense, k) || '🏷️')]);
     $('#catList').innerHTML = brkHTML(cats, expSum);
   }
   if (travel.length) {
     const ts = sum(travel);
     $('#travelTotal').textContent = baht(ts);
-    const subs = groupSum(travel, t => t.sub || 'อื่นๆ').map(([k, v]) => [k, v, mp.travel[k] || '🚌']);
+    const subs = groupSum(travel, t => tn(t.sub) || 'Other').map(([k, v]) => [k, v, ic(mp.travel, k) || '🚌']);
     $('#travelList').innerHTML = brkHTML(subs, ts, 'trv');
   }
 
-  /* รายการ / ตารางรายเดือน */
+  /* entries / monthly table */
   const dc = $('#detailList');
   if (ui.range === 'year') {
-    $('#detailTitle').textContent = 'สรุปรายเดือน';
+    $('#detailTitle').textContent = 'Monthly summary';
     dc.classList.remove('list');
-    let html = '<div class="mrow head"><span>เดือน</span><span>รายรับ</span><span>รายจ่าย</span><span>คงเหลือ</span></div>';
+    let html = '<div class="mrow head"><span>Month</span><span>Income</span><span>Expenses</span><span>Balance</span></div>';
     let any = false;
     for (let m = 0; m < 12; m++) {
       const pre = `${p.y}-${pad(m + 1)}`;
@@ -335,11 +389,11 @@ function renderSummary() {
       any = true;
       html += `<div class="mrow"><span>${esc(F_M.format(new Date(p.y, m, 1)))}</span><span class="i">${money(mi)}</span><span class="e">${money(me)}</span><span>${money(mi - me)}</span></div>`;
     }
-    dc.innerHTML = any ? html : '<div class="empty">ยังไม่มีรายการในปีนี้</div>';
+    dc.innerHTML = any ? html : '<div class="empty">No entries this year</div>';
   } else {
-    $('#detailTitle').textContent = 'รายการ (' + inRange.length + ')';
+    $('#detailTitle').textContent = 'Entries (' + inRange.length + ')';
     dc.classList.add('list');
-    if (!inRange.length) dc.innerHTML = '<div class="empty">ยังไม่มีรายการ</div>';
+    if (!inRange.length) dc.innerHTML = '<div class="empty">No entries yet</div>';
     else {
       const sorted = sortTx(inRange);
       let html = '', cur = '';
@@ -347,7 +401,7 @@ function renderSummary() {
         if (ui.range === 'week' && t.date !== cur) {
           cur = t.date;
           const dayExp = sum(sorted.filter(x => x.date === cur && x.type === 'expense'));
-          html += `<div class="dayhead"><span>${esc(F_FULL.format(parseYmd(cur)))}</span><span>${dayExp ? 'จ่าย ' + baht(dayExp) : ''}</span></div>`;
+          html += `<div class="dayhead"><span>${esc(F_FULL.format(parseYmd(cur)))}</span><span>${dayExp ? 'Spent ' + baht(dayExp) : ''}</span></div>`;
         }
         html += itemHTML(t, mp, false);
       });
@@ -360,8 +414,9 @@ function renderSummary() {
 function setSync(state, text) {
   const b = $('#syncBtn');
   b.className = 'sync ' + (state === 'ok' ? 'ok' : state === 'busy' ? 'busy' : state === 'warn' ? 'warn' : state === 'err' ? 'err' : '');
-  $('#syncText').textContent = text || ({ ok: 'ซิงค์แล้ว', busy: 'กำลังซิงค์', unset: 'ยังไม่เชื่อมต่อ' }[state] || '—');
+  $('#syncText').textContent = text || ({ ok: 'Synced', busy: 'Syncing', unset: 'Not connected' }[state] || '—');
 }
+const pendingText = () => queue.length + ' pending';
 
 async function fetchJson(url, opts, timeout = 20000) {
   const ctl = new AbortController();
@@ -378,7 +433,7 @@ const apiGet = (url, key) =>
 const apiPost = op =>
   fetchJson(cfg.url, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // text/plain = ไม่ติด CORS preflight
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // text/plain avoids a CORS preflight
     body: JSON.stringify(Object.assign({ key: cfg.key }, op))
   });
 
@@ -406,13 +461,13 @@ async function sync(manual) {
   syncing = true;
   setSync('busy');
   try {
-    let f = await flush();
-    if (f === 'auth') { setSync('err', 'รหัสลับไม่ตรง'); if (manual) toast('รหัสลับไม่ตรงกับใน Code.gs'); return; }
-    if (f === 'err') { setSync('err', 'เซิร์ฟเวอร์ผิดพลาด'); return; }
-    if (f === 'net') { setSync('warn', queue.length ? queue.length + ' รอซิงค์' : 'ออฟไลน์'); return; }
+    const f = await flush();
+    if (f === 'auth') { setSync('err', 'Wrong key'); if (manual) toast("Secret key doesn't match Code.gs"); return; }
+    if (f === 'err') { setSync('err', 'Server error'); return; }
+    if (f === 'net') { setSync('warn', queue.length ? pendingText() : 'Offline'); return; }
 
     const res = await apiGet(cfg.url, cfg.key);
-    if (!res.ok) { setSync('err', res.error === 'unauthorized' ? 'รหัสลับไม่ตรง' : 'ผิดพลาด'); return; }
+    if (!res.ok) { setSync('err', res.error === 'unauthorized' ? 'Wrong key' : 'Error'); return; }
 
     const server = (res.tx || []).map(t => Object.assign({}, t, { amount: Number(t.amount) || 0, travel: Number(t.travel) || 0 }));
     const pendDel = new Set(queue.filter(o => o.op === 'delete').map(o => o.id));
@@ -424,18 +479,20 @@ async function sync(manual) {
     const sv = res.settings || {};
     if (!hasPendingSettings) {
       if (Object.keys(sv).length) {
-        settings = Object.assign({}, DEFAULTS, sv);
+        const m = migrate(Object.assign({}, DEFAULTS, sv));
+        settings = m.s;
         saveSettingsLocal();
+        if (m.changed) { queue.push({ op: 'saveSettings', settings }); saveQueue(); await flush(); }
       } else {
-        queue.push({ op: 'saveSettings', settings }); saveQueue();   // ชีตใหม่ → ส่งค่าเริ่มต้นขึ้นไป
+        queue.push({ op: 'saveSettings', settings }); saveQueue();   // brand-new sheet → upload defaults
         await flush();
       }
     }
-    setSync(queue.length ? 'warn' : 'ok', queue.length ? queue.length + ' รอซิงค์' : undefined);
-    if (manual) toast('ซิงค์เรียบร้อย');
+    setSync(queue.length ? 'warn' : 'ok', queue.length ? pendingText() : undefined);
+    if (manual) toast('Synced');
   } catch (e) {
-    setSync('warn', queue.length ? queue.length + ' รอซิงค์' : 'ออฟไลน์');
-    if (manual) toast('เชื่อมต่อไม่ได้ ลองใหม่อีกครั้ง');
+    setSync('warn', queue.length ? pendingText() : 'Offline');
+    if (manual) toast("Can't connect. Try again.");
   } finally {
     syncing = false;
     render();
@@ -443,14 +500,17 @@ async function sync(manual) {
 }
 
 /* ================= settings sheet ================= */
+function fillLists(src) {
+  $('#setAccounts').value = src.accounts.join('\n');
+  $('#setExpense').value = src.expense.join('\n');
+  $('#setIncome').value = src.income.join('\n');
+  $('#setTravel').value = src.travel.join('\n');
+}
 function openSettings() {
   $('#cfgUrl').value = cfg.url;
   $('#cfgKey').value = cfg.key;
   $('#testMsg').textContent = ''; $('#testMsg').className = 'hint';
-  $('#setAccounts').value = settings.accounts.join('\n');
-  $('#setExpense').value = settings.expense.join('\n');
-  $('#setIncome').value = settings.income.join('\n');
-  $('#setTravel').value = settings.travel.join('\n');
+  fillLists(settings);
   markSettingsSegs();
   $('#sheet').hidden = false;
   document.body.style.overflow = 'hidden';
@@ -465,15 +525,15 @@ const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean);
 async function testConn() {
   const url = $('#cfgUrl').value.trim(), key = $('#cfgKey').value;
   const msg = $('#testMsg');
-  if (!/^https:\/\/script\.google\.com\/.+\/exec/.test(url)) { msg.className = 'hint bad'; msg.textContent = 'URL ต้องขึ้นต้นด้วย https://script.google.com/ และลงท้าย /exec'; return; }
-  msg.className = 'hint'; msg.textContent = 'กำลังทดสอบ…';
+  if (!/^https:\/\/script\.google\.com\/.+\/exec/.test(url)) { msg.className = 'hint bad'; msg.textContent = 'The URL must start with https://script.google.com/ and end with /exec'; return; }
+  msg.className = 'hint'; msg.textContent = 'Testing…';
   try {
     const r = await apiGet(url, key);
-    if (r.ok) { msg.className = 'hint ok'; msg.textContent = `เชื่อมต่อสำเร็จ ✓ พบ ${(r.tx || []).length} รายการ`; }
-    else { msg.className = 'hint bad'; msg.textContent = r.error === 'unauthorized' ? 'รหัสลับไม่ตรงกับใน Code.gs' : 'เซิร์ฟเวอร์ตอบกลับผิดพลาด'; }
+    if (r.ok) { msg.className = 'hint ok'; msg.textContent = `Connected ✓ Found ${(r.tx || []).length} entries`; }
+    else { msg.className = 'hint bad'; msg.textContent = r.error === 'unauthorized' ? "Secret key doesn't match Code.gs" : 'The server returned an error'; }
   } catch (e) {
     msg.className = 'hint bad';
-    msg.textContent = 'เชื่อมต่อไม่ได้ — เช็ก URL และตอน Deploy ต้องตั้ง "Who has access" เป็น Anyone';
+    msg.textContent = `Can't connect — check the URL, and make sure "Who has access" is set to Anyone when deploying`;
   }
 }
 
@@ -494,7 +554,7 @@ function saveSettingsForm() {
   ui.category = '';
   closeSettings();
   render();
-  toast('บันทึกการตั้งค่าแล้ว');
+  toast('Settings saved');
   sync();
 }
 
@@ -503,7 +563,7 @@ function showPage(name) {
   ui.page = name;
   $('#page-entry').hidden = name !== 'entry';
   $('#page-summary').hidden = name !== 'summary';
-  $('#pageTitle').textContent = name === 'entry' ? 'บันทึก' : 'สรุป';
+  $('#pageTitle').textContent = name === 'entry' ? 'Add' : 'Summary';
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.page === name));
   window.scrollTo(0, 0);
   render();
@@ -524,7 +584,7 @@ $('#methodSeg').addEventListener('click', e => {
 });
 $('#accountRow').addEventListener('click', e => {
   const b = e.target.closest('button[data-acc]'); if (!b) return;
-  ui.account = settings.accounts[Number(b.dataset.acc)]; renderEntry();
+  ui.account = parseItem(settings.accounts[Number(b.dataset.acc)]).name; renderEntry();
 });
 $('#catChips').addEventListener('click', e => {
   const b = e.target.closest('button[data-cat]'); if (!b) return;
@@ -532,7 +592,6 @@ $('#catChips').addEventListener('click', e => {
   ui.category = ui.category === name ? '' : name;
   renderEntry();
 });
-const sizeAmount = () => { const a = $('#amount'); a.style.width = Math.max(1, a.value.length) + 'ch'; };
 $('#amount').addEventListener('input', e => {
   const v = e.target.value.replace(/[^\d.,]/g, '');
   if (v !== e.target.value) e.target.value = v;
@@ -562,6 +621,7 @@ $('#setupBtn').addEventListener('click', openSettings);
 $('#closeSheet').addEventListener('click', closeSettings);
 $('#sheetBg').addEventListener('click', closeSettings);
 $('#testBtn').addEventListener('click', testConn);
+$('#resetLists').addEventListener('click', () => { fillLists(DEFAULTS); toast('Defaults loaded — tap Save settings'); });
 $('#saveCfg').addEventListener('click', saveSettingsForm);
 $('#themeSeg').addEventListener('click', e => {
   const b = e.target.closest('button[data-theme]'); if (!b) return;
@@ -575,7 +635,7 @@ $('#syncBtn').addEventListener('click', () => cfg.url ? sync(true) : openSetting
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    // วันเปลี่ยนตอนเปิดแอพค้างไว้ → รีเซ็ตวันที่
+    // app left open overnight → reset the date to today
     if (ui.date < todayStr() && ui.page === 'entry' && !$('#amount').value) ui.date = todayStr();
     sync();
   }
@@ -586,7 +646,7 @@ window.addEventListener('online', () => sync());
 applyTheme();
 render();
 sizeAmount();
-setSync(cfg.url ? (queue.length ? 'warn' : 'ok') : 'unset', cfg.url && queue.length ? queue.length + ' รอซิงค์' : undefined);
+setSync(cfg.url ? (queue.length ? 'warn' : 'ok') : 'unset', cfg.url && queue.length ? pendingText() : undefined);
 sync();
 
 if ('serviceWorker' in navigator) {
