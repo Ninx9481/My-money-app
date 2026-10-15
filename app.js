@@ -95,7 +95,8 @@ const ui = {
   category: '',
   date: todayStr(),
   range: 'day',
-  anchor: new Date()
+  anchor: new Date(),
+  entriesOpen: LS.get('entriesOpen', false)
 };
 
 const saveCfg = () => LS.set('cfg', cfg);
@@ -113,7 +114,7 @@ const saveQueue = () => LS.set('queue', queue);
 }
 
 /* ================= theme ================= */
-const COLORS = { light: '#f6f3ea', dark: '#0e0f13' };
+const COLORS = { light: '#f4f2ed', dark: '#0e0f13' };
 function applyTheme() {
   const r = document.documentElement;
   if (cfg.theme === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', cfg.theme);
@@ -175,7 +176,7 @@ const accountNames = () => settings.accounts.map(a => parseItem(a).name);
 
 function sizeAmount() {
   const a = $('#amount');
-  a.style.width = ((a.value ? Math.max(1, a.value.length) : 4) + 0.7) + 'ch';   // empty → fits the "0.00" placeholder; +0.7 = slack so iOS never clips the last digit
+  $('#amountMirror').textContent = a.value || '0.00';   // hidden mirror = exact text width → number stays centred
 }
 
 function renderEntry() {
@@ -189,14 +190,14 @@ function renderEntry() {
   if (ui.method === 'account' && settings.accounts.length > 1) {
     accRow.innerHTML = settings.accounts.map((a, i) => {
       const p = parseItem(a);
-      return `<button type="button" class="chip${p.name === ui.account ? ' on' : ''}" data-acc="${i}">${esc((p.icon ? p.icon + ' ' : '') + p.name)}</button>`;
+      return `<button type="button" class="chip${p.name === ui.account ? ' on' : ''}" data-acc="${i}">${esc(p.name)}</button>`;
     }).join('');
   } else accRow.innerHTML = '';
 
   $('#catLabel').textContent = ui.mode === 'travel' ? 'Travel type' : 'Category';
   $('#catChips').innerHTML = listFor(ui.mode).map((c, i) => {
     const p = parseItem(c);
-    return `<button type="button" class="chip${p.name === ui.category ? ' on' : ''}" data-cat="${i}">${esc((p.icon ? p.icon + ' ' : '') + p.name)}</button>`;
+    return `<button type="button" class="chip${p.name === ui.category ? ' on' : ''}" data-cat="${i}">${esc(p.name)}</button>`;
   }).join('');
 
   $('#saveBtn').textContent = ui.mode === 'income' ? 'Save income' : ui.mode === 'travel' ? 'Save travel' : 'Save expense';
@@ -301,13 +302,27 @@ function groupSum(arr, keyFn) {
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
 }
 
-function brkHTML(rows, total, cls) {
-  if (!rows.length) return '<div class="empty">No data</div>';
-  return rows.map(([name, v, icon]) => {
-    const pct = total ? Math.round(v / total * 100) : 0;
-    return `<div class="brk"><div class="h"><span>${esc(icon ? icon + ' ' : '')}${esc(name)}<em>${pct}%</em></span><span>${baht(v)}</span></div>
-      <div class="track"><i class="${cls || ''}" style="width:${Math.max(pct, 2)}%"></i></div></div>`;
-  }).join('');
+const COMP_COLORS = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)'];
+// part-to-whole: ONE stacked bar + a legend that always names every segment and its value
+function compHTML(rows, total) {
+  if (!rows.length || !total) return '<div class="empty">No data</div>';
+  let list = rows.map(r => [r[0], r[1], false]);
+  if (list.length > 6) {
+    const rest = list.slice(6);
+    list = list.slice(0, 6).concat([[rest.length === 1 ? rest[0][0] : 'Other', rest.reduce((a, r) => a + r[1], 0), true]]);
+  }
+  const parts = list.map(([name, v, other], i) => {
+    const pct = Math.round(v / total * 100);
+    return { name, v, pct, color: other ? 'var(--s-other)' : COMP_COLORS[i], tip: `${name} · ${baht(v)} · ${pct}%` };
+  });
+  const bar = parts.map(p => `<i data-tip="${esc(p.tip)}" style="flex:${p.v};background:${p.color}"></i>`).join('');
+  const legend = parts.map(p => `<button type="button" class="lg" data-tip="${esc(p.tip)}"><span class="sw" style="background:${p.color}"></span><span class="nm">${esc(p.name)}</span><span class="pc">${p.pct}%</span><span class="vl">${baht(p.v)}</span></button>`).join('');
+  return `<div class="stack">${bar}</div><div class="legend-list">${legend}</div><div class="tip">Tap a segment for details</div>`;
+}
+
+function hbRow(name, v, max, cls) {
+  const w = max ? Math.max(v / max * 100, v ? 2 : 0) : 0;
+  return `<div class="brk"><div class="h"><span>${esc(name)}</span><span>${baht(v)}</span></div><div class="track"><i class="${cls}" style="width:${w}%"></i></div></div>`;
 }
 
 function renderSummary() {
@@ -325,17 +340,21 @@ function renderSummary() {
   $('#sumNet').textContent = baht(net);
   $('.tot.net').classList.toggle('neg', net < 0);
 
-  /* chart (week / year) */
-  const chartCard = $('#chartCard');
-  if (ui.range === 'day') chartCard.hidden = true;
-  else {
-    chartCard.hidden = false;
+  /* income vs expenses: two bars (day) · bars per day (week) · bars per month (year) */
+  const body = $('#chartBody');
+  if (ui.range === 'day') {
+    $('#chartTitle').textContent = 'Income vs expenses';
+    const max = Math.max(incSum, expSum);
+    body.innerHTML = hbRow('Income', incSum, max, 'i') + hbRow('Expenses', expSum, max, 'e');
+    $('#chartLegend').hidden = true;
+    $('#chartTip').textContent = '';
+  } else {
     let buckets;
     const t = todayStr();
     if (ui.range === 'week') {
       buckets = Array.from({ length: 7 }, (_, i) => {
         const d = addDays(p.start, i), k = ymd(d);
-        return { label: F_W.format(d), cur: k === t,
+        return { label: F_W.format(d), full: F_FULL.format(d), cur: k === t,
           e: sum(exp.filter(x => x.date === k)), i: sum(inc.filter(x => x.date === k)) };
       });
       $('#chartTitle').textContent = 'Daily this week';
@@ -343,43 +362,45 @@ function renderSummary() {
       buckets = Array.from({ length: 12 }, (_, m) => {
         const pre = `${p.y}-${pad(m + 1)}`;
         const now = new Date();
-        return { label: F_M.format(new Date(p.y, m, 1)), cur: now.getFullYear() === p.y && now.getMonth() === m,
+        return { label: F_M.format(new Date(p.y, m, 1)), full: F_M.format(new Date(p.y, m, 1)) + ' ' + p.y,
+          cur: now.getFullYear() === p.y && now.getMonth() === m,
           e: sum(exp.filter(x => x.date.startsWith(pre))), i: sum(inc.filter(x => x.date.startsWith(pre))) };
       });
       $('#chartTitle').textContent = 'Monthly this year';
     }
     const max = Math.max(1, ...buckets.map(b => Math.max(b.e, b.i)));
-    $('#chart').innerHTML = buckets.map(b => `<div class="col${b.cur ? ' cur' : ''}">
-      <div class="bars"><div class="bar e" style="height:${b.e / max * 100}%"></div><div class="bar i" style="height:${b.i / max * 100}%"></div></div>
-      <div class="lb">${esc(b.label)}</div></div>`).join('');
+    body.innerHTML = '<div class="chart">' + buckets.map(b => {
+      const tip = `${b.full} · Spent ${baht(b.e)} · Income ${baht(b.i)}`;
+      return `<button type="button" class="col${b.cur ? ' cur' : ''}" data-tip="${esc(tip)}" aria-label="${esc(tip)}">
+        <div class="bars"><div class="bar e" style="height:${b.e / max * 100}%"></div><div class="bar i" style="height:${b.i / max * 100}%"></div></div>
+        <div class="lb">${esc(b.label)}</div></button>`;
+    }).join('') + '</div>';
+    $('#chartLegend').hidden = false;
+    $('#chartTip').textContent = 'Tap a bar for details';
   }
 
-  /* by payment method / category / travel */
+  /* composition: category / payment method / travel */
   const has = exp.length > 0;
-  $('#splitCard').hidden = !has;
   $('#catCard').hidden = !has;
+  $('#splitCard').hidden = !has;
   const travel = exp.filter(t => t.travel);
   $('#travelCard').hidden = !travel.length;
   if (has) {
-    const split = groupSum(exp, t => t.method === 'cash' ? 'Cash' : (tn(t.account) || 'Account'))
-      .map(([k, v]) => [k, v, k === 'Cash' ? '💵' : acctIcon(mp, k)]);
-    $('#splitList').innerHTML = brkHTML(split, expSum, 'acc');
-    const cats = groupSum(exp, t => t.travel ? TRAVEL : (tn(t.category) || NONE))
-      .map(([k, v]) => [k, v, k === TRAVEL ? '🚌' : (ic(mp.expense, k) || '🏷️')]);
-    $('#catList').innerHTML = brkHTML(cats, expSum);
+    $('#splitList').innerHTML = compHTML(groupSum(exp, t => t.method === 'cash' ? 'Cash' : (tn(t.account) || 'Account')), expSum);
+    $('#catList').innerHTML = compHTML(groupSum(exp, t => t.travel ? TRAVEL : (tn(t.category) || NONE)), expSum);
   }
   if (travel.length) {
     const ts = sum(travel);
     $('#travelTotal').textContent = baht(ts);
-    const subs = groupSum(travel, t => tn(t.sub) || 'Other').map(([k, v]) => [k, v, ic(mp.travel, k) || '🚌']);
-    $('#travelList').innerHTML = brkHTML(subs, ts, 'trv');
+    $('#travelList').innerHTML = compHTML(groupSum(travel, t => tn(t.sub) || 'Other'), ts);
   }
 
-  /* entries / monthly table */
+  /* entries (collapsible, at the bottom) / monthly table */
   const dc = $('#detailList');
+  $('#detailBody').hidden = !ui.entriesOpen;
+  $('#detailToggle').setAttribute('aria-expanded', String(ui.entriesOpen));
   if (ui.range === 'year') {
     $('#detailTitle').textContent = 'Monthly summary';
-    dc.classList.remove('list');
     let html = '<div class="mrow head"><span>Month</span><span>Income</span><span>Expenses</span><span>Balance</span></div>';
     let any = false;
     for (let m = 0; m < 12; m++) {
@@ -392,7 +413,6 @@ function renderSummary() {
     dc.innerHTML = any ? html : '<div class="empty">No entries this year</div>';
   } else {
     $('#detailTitle').textContent = 'Entries (' + inRange.length + ')';
-    dc.classList.add('list');
     if (!inRange.length) dc.innerHTML = '<div class="empty">No entries yet</div>';
     else {
       const sorted = sortTx(inRange);
@@ -604,7 +624,18 @@ $('#saveBtn').addEventListener('click', addEntry);
 
 document.addEventListener('click', e => {
   const d = e.target.closest('[data-del]');
-  if (d) removeTx(d.dataset.del);
+  if (d) { removeTx(d.dataset.del); return; }
+  const t = e.target.closest('[data-tip]');
+  if (t) {
+    const card = t.closest('.card');
+    const tip = card && card.querySelector('.tip');
+    if (tip) tip.textContent = t.dataset.tip;
+    if (card) $$('.col.sel', card).forEach(x => x.classList.remove('sel'));
+    if (t.classList.contains('col')) t.classList.add('sel');
+  }
+});
+$('#detailToggle').addEventListener('click', () => {
+  ui.entriesOpen = !ui.entriesOpen; LS.set('entriesOpen', ui.entriesOpen); renderSummary();
 });
 
 $$('.tabs button').forEach(b => b.addEventListener('click', () => showPage(b.dataset.page)));
@@ -642,9 +673,24 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('online', () => sync());
 
+/* ================= sliding glass thumbs ================= */
+function syncSegs() {
+  $$('.seg, .tabs').forEach(el => {
+    if (!el.querySelector(':scope > .thumb')) { const th = document.createElement('span'); th.className = 'thumb'; el.prepend(th); }
+    const btns = [...el.children].filter(c => c.tagName === 'BUTTON');
+    el.style.setProperty('--n', btns.length);
+    el.style.setProperty('--i', Math.max(0, btns.findIndex(b => b.classList.contains('on'))));
+  });
+}
+let segRaf;
+new MutationObserver(() => { cancelAnimationFrame(segRaf); segRaf = requestAnimationFrame(syncSegs); })
+  .observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+
 /* ================= boot ================= */
 applyTheme();
 render();
+syncSegs();
+requestAnimationFrame(() => requestAnimationFrame(() => $$('.seg, .tabs').forEach(el => el.classList.add('ready'))));
 sizeAmount();
 setSync(cfg.url ? (queue.length ? 'warn' : 'ok') : 'unset', cfg.url && queue.length ? pendingText() : undefined);
 sync();
