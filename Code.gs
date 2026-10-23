@@ -103,7 +103,7 @@ function addTx_(t) {
     for (let i = 0; i < ids.length; i++) if (String(ids[i][0]) === String(t.id)) return;
   }
   sh.appendRow([
-    String(t.id), String(t.date), t.type === 'income' ? 'income' : 'expense',
+    String(t.id), String(t.date), (t.type === 'income' || t.type === 'transfer') ? t.type : 'expense',
     Number(t.amount) || 0, t.method === 'cash' ? 'cash' : 'account',
     t.account || '', t.category || '', t.sub || '', t.note || '',
     t.travel ? 1 : 0, t.createdAt || new Date().toISOString()

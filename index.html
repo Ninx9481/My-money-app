@@ -41,6 +41,7 @@
           <button type="button" data-mode="expense" class="on">Expense</button>
           <button type="button" data-mode="income">Income</button>
           <button type="button" data-mode="travel">Travel</button>
+          <button type="button" data-mode="transfer">Transfer</button>
         </div>
 
         <label class="amount">
@@ -51,15 +52,27 @@
           </span>
         </label>
 
+        <div id="methodGroup">
         <div class="field-label">Paid / received via</div>
         <div class="seg sm" id="methodSeg">
           <button type="button" data-method="account" class="on">Account</button>
           <button type="button" data-method="cash">Cash</button>
         </div>
         <div id="accountRow" class="chips"></div>
+        </div>
 
+        <div id="catGroup">
         <div class="field-label" id="catLabel">Category</div>
         <div id="catChips" class="chips cats"></div>
+        </div>
+
+        <div id="transferGroup" hidden>
+          <div class="field-label">From</div>
+          <div id="fromRow" class="chips"></div>
+          <div class="swap-row"><button type="button" id="swapBtn" class="link">⇅ Swap</button></div>
+          <div class="field-label">To</div>
+          <div id="toRow" class="chips"></div>
+        </div>
 
         <div class="row2">
           <input id="note" type="text" placeholder="Note (optional)" autocomplete="off" enterkeyhint="done">

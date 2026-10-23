@@ -43,6 +43,8 @@ function parseItem(s) {
 
 /* ================= constants / defaults ================= */
 const TRAVEL = 'Travel';
+const TO_CASH = '@cash';        // marks cash as the destination of a transfer (stored in the 'sub' column)
+const CASH_KEY = '__cash__';
 const NONE = 'Uncategorized';
 
 const DEFAULTS = {
@@ -97,6 +99,7 @@ const ui = {
   range: 'day',
   anchor: new Date(),
   entriesOpen: LS.get('entriesOpen', false),
+  from: '', to: '',
   recentN: 50,
   balEdit: false
 };
@@ -152,6 +155,7 @@ const ic = (map, raw) => map[raw] || map[tn(raw)] || '';
 const acctIcon = (mp, name) => ic(mp.accounts, name) || '🏦';
 
 function itemInfo(t, mp) {
+  if (t.type === 'transfer') return { icon: '🔁', title: 'Transfer' };
   if (t.travel) return { icon: ic(mp.travel, t.sub) || '🚌', title: tn(t.sub) || TRAVEL };
   if (t.type === 'income') return { icon: ic(mp.income, t.category) || '💰', title: tn(t.category) || 'Income' };
   return { icon: ic(mp.expense, t.category) || (tn(t.category) === TRAVEL ? '🚌' : '🏷️'), title: tn(t.category) || NONE };
@@ -159,9 +163,10 @@ function itemInfo(t, mp) {
 
 function itemHTML(t, mp, showDate) {
   const info = itemInfo(t, mp);
-  const way = t.method === 'cash' ? '💵 Cash' : acctIcon(mp, t.account) + ' ' + (tn(t.account) || 'Account');
+  const end = (cash, name) => cash ? '💵 Cash' : acctIcon(mp, name) + ' ' + (tn(name) || 'Account');
+  const way = t.type === 'transfer' ? end(t.method === 'cash', t.account) + ' → ' + end(t.sub === TO_CASH, t.sub) : end(t.method === 'cash', t.account);
   const sub = [showDate ? dateLabel(t.date) : '', way, t.note].filter(Boolean).map(esc).join(' · ');
-  const sign = t.type === 'income' ? '+' : '−';
+  const sign = t.type === 'transfer' ? '' : t.type === 'income' ? '+' : '−';
   return `<div class="item">
     <div class="ico">${esc(info.icon)}</div>
     <div class="mid"><div class="t">${esc(info.title)}</div><div class="s">${sub}</div></div>
@@ -185,6 +190,8 @@ function renderEntry() {
   $('#entryCard').className = 'card entry mode-' + ui.mode;
   $$('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === ui.mode));
   $$('#methodSeg button').forEach(b => b.classList.toggle('on', b.dataset.method === ui.method));
+  const isTr = ui.mode === 'transfer';
+  $('#methodGroup').hidden = isTr; $('#catGroup').hidden = isTr; $('#transferGroup').hidden = !isTr;
 
   const names = accountNames();
   if (!names.includes(ui.account)) ui.account = names[0] || '';
@@ -196,13 +203,21 @@ function renderEntry() {
     }).join('');
   } else accRow.innerHTML = '';
 
+  if (isTr) {
+    const ends = [{ v: CASH_KEY, n: 'Cash' }].concat(accountNames().map(n => ({ v: n, n })));
+    if (!ends.some(e => e.v === ui.from)) ui.from = ends.length > 1 ? ends[1].v : CASH_KEY;
+    if (!ends.some(e => e.v === ui.to) || ui.to === ui.from) ui.to = (ends.find(e => e.v !== ui.from) || {}).v || '';
+    const row = (cur, attr) => ends.map(e => `<button type="button" class="chip${e.v === cur ? ' on' : ''}" data-${attr}="${esc(e.v)}">${esc(e.n)}</button>`).join('');
+    $('#fromRow').innerHTML = row(ui.from, 'from');
+    $('#toRow').innerHTML = row(ui.to, 'to');
+  }
   $('#catLabel').textContent = ui.mode === 'travel' ? 'Travel type' : 'Category';
   $('#catChips').innerHTML = listFor(ui.mode).map((c, i) => {
     const p = parseItem(c);
     return `<button type="button" class="chip${p.name === ui.category ? ' on' : ''}" data-cat="${i}">${esc(p.name)}</button>`;
   }).join('');
 
-  $('#saveBtn').textContent = ui.mode === 'income' ? 'Save income' : ui.mode === 'travel' ? 'Save travel' : 'Save expense';
+  $('#saveBtn').textContent = ui.mode === 'transfer' ? 'Save transfer' : ui.mode === 'income' ? 'Save income' : ui.mode === 'travel' ? 'Save travel' : 'Save expense';
   $('#date').value = ui.date;
   $('#setupBanner').hidden = !!cfg.url;
 
@@ -217,10 +232,15 @@ function addEntry() {
   const amt = parseAmount($('#amount').value);
   if (!(amt > 0)) { toast('Enter an amount first'); $('#amount').focus(); return; }
   const travel = ui.mode === 'travel';
+  if (ui.mode === 'transfer') {
+    if (!ui.from || !ui.to || ui.from === ui.to) { toast('Pick two different accounts'); return; }
+    const fc = ui.from === CASH_KEY;
+    var tr = { method: fc ? 'cash' : 'account', account: fc ? '' : ui.from, category: 'Transfer', sub: ui.to === CASH_KEY ? TO_CASH : ui.to };
+  }
   const t = {
     id: uid(),
     date: ui.date || todayStr(),
-    type: ui.mode === 'income' ? 'income' : 'expense',
+    type: ui.mode === 'income' ? 'income' : ui.mode === 'transfer' ? 'transfer' : 'expense',
     amount: amt,
     method: ui.method,
     account: ui.method === 'account' ? ui.account : '',
@@ -230,10 +250,11 @@ function addEntry() {
     travel: travel ? 1 : 0,
     createdAt: new Date().toISOString()
   };
+  if (tr) Object.assign(t, tr);
   tx.push(t);
   queue.push({ op: 'add', tx: t });
   saveTx(); saveQueue();
-  LS.set('lastAccount', ui.account);
+  if (ui.mode !== 'transfer') LS.set('lastAccount', ui.account);
 
   $('#amount').value = '';
   sizeAmount();
@@ -249,8 +270,8 @@ function addEntry() {
 function removeTx(id) {
   const t = tx.find(x => x.id === id);
   if (!t) return;
-  const label = t.travel ? (tn(t.sub) || TRAVEL) : tn(t.category);
-  if (!confirm(`Delete this entry?\n${t.type === 'income' ? '+' : '−'}${money(t.amount)} · ${label}`)) return;
+  const label = t.type === 'transfer' ? 'Transfer' : t.travel ? (tn(t.sub) || TRAVEL) : tn(t.category);
+  if (!confirm(`Delete this entry?\n${t.type === 'income' ? '+' : t.type === 'transfer' ? '' : '−'}${money(t.amount)} · ${label}`)) return;
   tx = tx.filter(x => x.id !== id);
   const i = queue.findIndex(o => o.op === 'add' && o.tx.id === id);
   if (i >= 0 && queue[i] !== inflight) queue.splice(i, 1);
@@ -283,7 +304,6 @@ function renderRecent() {
 }
 
 /* ================= balance page ================= */
-const CASH_KEY = '__cash__';
 const openingMap = () => (settings.opening && typeof settings.opening === 'object') ? settings.opening : {};
 function balances() {
   const op = openingMap();
@@ -292,7 +312,13 @@ function balances() {
   accountNames().forEach(n => row(n, n, true));
   row(CASH_KEY, 'Cash', true);
   tx.forEach(t => {
-    const r = t.method === 'cash' ? row(CASH_KEY, 'Cash', true) : row(tn(t.account) || 'Account', tn(t.account) || 'Account', false);
+    const side = (cash, name) => cash ? row(CASH_KEY, 'Cash', true) : row(tn(name) || 'Account', tn(name) || 'Account', false);
+    if (t.type === 'transfer') {
+      side(t.method === 'cash', t.account).exp += t.amount;        // money leaves the source
+      side(t.sub === TO_CASH, t.sub).inc += t.amount;               // and arrives at the destination
+      return;
+    }
+    const r = side(t.method === 'cash', t.account);
     if (t.type === 'income') r.inc += t.amount; else r.exp += t.amount;
   });
   Object.keys(op).forEach(k => { if (Number(op[k]) && k !== CASH_KEY) row(k, k, false); });
@@ -687,6 +713,12 @@ $('#methodSeg').addEventListener('click', e => {
   const b = e.target.closest('button[data-method]'); if (!b) return;
   ui.method = b.dataset.method; renderEntry();
 });
+$('#transferGroup').addEventListener('click', e => {
+  const f = e.target.closest('[data-from]'), t = e.target.closest('[data-to]');
+  if (f) { ui.from = f.dataset.from; if (ui.to === ui.from) ui.to = ''; renderEntry(); }
+  if (t) { ui.to = t.dataset.to; if (ui.from === ui.to) ui.from = ''; renderEntry(); }
+});
+$('#swapBtn').addEventListener('click', () => { [ui.from, ui.to] = [ui.to, ui.from]; renderEntry(); });
 $('#accountRow').addEventListener('click', e => {
   const b = e.target.closest('button[data-acc]'); if (!b) return;
   ui.account = parseItem(settings.accounts[Number(b.dataset.acc)]).name; renderEntry();

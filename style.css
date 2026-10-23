@@ -8,6 +8,7 @@
   --exp: #e5484d;
   --inc: #16a34a;
   --trv: #2f6fed;
+  --trf: #7c5cf0;
   --mode: var(--exp);
   --shadow: 0 1px 2px rgba(40, 36, 28, .06), 0 6px 20px rgba(40, 36, 28, .05);
   /* chart palette (categorical slots in fixed order) */
@@ -30,7 +31,7 @@
   :root:not([data-theme="light"]) {
     --bg: #0e0f13; --card: #1a1c22; --text: #f1f2f5; --muted: #9aa1ad;
     --line: #2a2d35; --chip: #262932;
-    --exp: #ff6369; --inc: #3ddc84; --trv: #6b9bff;
+    --exp: #ff6369; --inc: #3ddc84; --trv: #6b9bff; --trf: #a58bff;
     --shadow: none;
     --c-exp: #d95926; --c-inc: #199e70;
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #9085e9; --s-other: #6b7080;
@@ -46,7 +47,7 @@
 :root[data-theme="dark"] {
   --bg: #0e0f13; --card: #1a1c22; --text: #f1f2f5; --muted: #9aa1ad;
   --line: #2a2d35; --chip: #262932;
-  --exp: #ff6369; --inc: #3ddc84; --trv: #6b9bff;
+  --exp: #ff6369; --inc: #3ddc84; --trv: #6b9bff; --trf: #a58bff;
   --shadow: none;
   --c-exp: #d95926; --c-inc: #199e70;
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #9085e9; --s-other: #6b7080;
@@ -145,6 +146,7 @@ input, textarea { font: inherit; color: inherit; }
 .mode-expense { --mode: var(--exp); }
 .mode-income  { --mode: var(--inc); }
 .mode-travel  { --mode: var(--trv); }
+.mode-transfer { --mode: var(--trf); }
 #modeSeg button.on { color: var(--mode); }
 
 /* ---------- entry ---------- */
@@ -219,6 +221,7 @@ input, textarea { font: inherit; color: inherit; }
 .item .amt { font-weight: 700; font-variant-numeric: tabular-nums; }
 .amt.expense { color: var(--exp); }
 .amt.income { color: var(--inc); }
+.amt.transfer { color: var(--trf); }
 .del { width: 32px; height: 32px; border-radius: 10px; color: var(--muted); font-size: 18px; flex: none; }
 .del:active { background: var(--chip); }
 .dayhead { display: flex; justify-content: space-between; padding: 12px 0 2px; font-size: 13px; color: var(--muted); font-weight: 600; }
@@ -358,3 +361,7 @@ input, textarea { font: inherit; color: inherit; }
 .chip.ed button:active { background: var(--chip); }
 .chip.add { padding: 7px 14px; font-size: 14px; color: var(--trv); background: none; border: 1px dashed color-mix(in srgb, var(--trv) 55%, transparent); font-weight: 600; }
 .chip-input { width: 150px; padding: 7px 14px; font-size: 16px; border: 1px solid var(--trv); outline: 0; background: var(--card); color: var(--text); }
+
+.swap-row { display: flex; justify-content: flex-end; margin-top: 4px; }
+#transferGroup .field-label { margin-top: 10px; }
+#swapBtn { color: var(--trf); }
