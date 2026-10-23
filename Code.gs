@@ -102,12 +102,31 @@ function addTx_(t) {
     const ids = sh.getRange(2, 1, last - 1, 1).getValues();
     for (let i = 0; i < ids.length; i++) if (String(ids[i][0]) === String(t.id)) return;
   }
-  sh.appendRow([
+  sh.appendRow(txRow_(t));
+}
+
+function txRow_(t) {
+  return [
     String(t.id), String(t.date), (t.type === 'income' || t.type === 'transfer') ? t.type : 'expense',
     Number(t.amount) || 0, t.method === 'cash' ? 'cash' : 'account',
     t.account || '', t.category || '', t.sub || '', t.note || '',
     t.travel ? 1 : 0, t.createdAt || new Date().toISOString()
-  ]);
+  ];
+}
+
+// แก้ไขรายการเดิม (หาแถวจาก id แล้วเขียนทับทั้งแถว)
+function updateTx_(t) {
+  const sh = txSheet_();
+  const last = sh.getLastRow();
+  if (last < 2) return;
+  const ids = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(t.id)) {
+      const row = txRow_(t);
+      sh.getRange(i + 2, 1, 1, row.length).setValues([row]);
+      return;
+    }
+  }
 }
 
 function deleteTx_(id) {
@@ -136,6 +155,7 @@ function doPost(e) {
   try {
     switch (body.op) {
       case 'add': addTx_(body.tx); break;
+      case 'update': updateTx_(body.tx); break;
       case 'delete': deleteTx_(body.id); break;
       case 'saveSettings': saveSettings_(body.settings); break;
       case 'ping': break;

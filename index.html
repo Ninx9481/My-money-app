@@ -86,7 +86,8 @@
 
     <!-- ========== Page 2: Recent ========== -->
     <section id="page-recent" class="page" hidden>
-      <div id="recentList" class="card list"></div>
+      <input id="recentSearch" class="search" type="search" placeholder="Search note, category, amount" autocomplete="off" autocapitalize="off" enterkeyhint="search" aria-label="Search entries">
+      <div id="recentList"></div>
       <button type="button" id="recentMore" class="ghost more" hidden>Show more</button>
     </section>
 
@@ -109,6 +110,7 @@
       <div class="seg range" id="rangeSeg">
         <button type="button" data-range="day" class="on">Day</button>
         <button type="button" data-range="week">Week</button>
+        <button type="button" data-range="month">Month</button>
         <button type="button" data-range="year">Year</button>
       </div>
 
@@ -129,6 +131,12 @@
         <div id="chartBody"></div>
         <div class="legend" id="chartLegend"><span><i class="d exp"></i>Expenses</span><span><i class="d inc"></i>Income</span></div>
         <div class="tip" id="chartTip"></div>
+      </div>
+
+      <div class="card" id="budgetCard" hidden>
+        <div class="card-title"><span>Monthly budget</span><button type="button" id="budEdit" class="link">Set budget</button></div>
+        <div id="budBody"></div>
+        <p class="hint" id="budHint"></p>
       </div>
 
       <div class="card comp" id="catCard">
@@ -221,6 +229,16 @@
       <button type="button" id="resetLists" class="ghost">Reset lists to defaults</button>
     </div>
     <div class="sheet-foot"><button type="button" id="saveCfg" class="save">Save settings</button></div>
+  </div>
+</div>
+
+<!-- ========== Edit entry ========== -->
+<div id="editSheet" class="sheet" hidden>
+  <div class="sheet-bg" id="editBg"></div>
+  <div class="sheet-body" role="dialog" aria-label="Edit entry">
+    <div class="sheet-head"><h2 id="editTitle">Edit entry</h2><button type="button" id="closeEdit" class="icon-btn" aria-label="Close">✕</button></div>
+    <div class="sheet-scroll" id="editBody"></div>
+    <div class="sheet-foot"><button type="button" id="saveEdit" class="save">Save changes</button></div>
   </div>
 </div>
 

@@ -24,6 +24,7 @@ const F_FULL = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeri
 const F_DM = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const F_M = new Intl.DateTimeFormat('en-GB', { month: 'short' });
 const F_W = new Intl.DateTimeFormat('en-GB', { weekday: 'short' });
+const F_MONTH = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' });
 const F_Y = new Intl.DateTimeFormat('en-GB', { year: 'numeric' });
 
 function dateLabel(s) {
@@ -100,7 +101,7 @@ const ui = {
   anchor: new Date(),
   entriesOpen: LS.get('entriesOpen', false),
   from: '', to: '',
-  recentN: 50,
+  recentN: 50, q: '', budEdit: false,
   balEdit: false
 };
 
@@ -167,7 +168,7 @@ function itemHTML(t, mp, showDate) {
   const way = t.type === 'transfer' ? end(t.method === 'cash', t.account) + ' → ' + end(t.sub === TO_CASH, t.sub) : end(t.method === 'cash', t.account);
   const sub = [showDate ? dateLabel(t.date) : '', way, t.note].filter(Boolean).map(esc).join(' · ');
   const sign = t.type === 'transfer' ? '' : t.type === 'income' ? '+' : '−';
-  return `<div class="item">
+  return `<div class="item" data-edit="${esc(t.id)}">
     <div class="ico">${esc(info.icon)}</div>
     <div class="mid"><div class="t">${esc(info.title)}</div><div class="s">${sub}</div></div>
     <div class="amt ${t.type}">${sign}${money(t.amount)}</div>
@@ -267,12 +268,19 @@ function addEntry() {
   sync();
 }
 
+function queueUpdate(t) {
+  const k = queue.findIndex(o => (o.op === 'add' || o.op === 'update') && o.tx.id === t.id && o !== inflight);
+  if (k >= 0) queue[k] = Object.assign({}, queue[k], { tx: t });   // fold into the not-yet-sent op
+  else queue.push({ op: 'update', tx: t });
+}
+
 function removeTx(id) {
   const t = tx.find(x => x.id === id);
   if (!t) return;
   const label = t.type === 'transfer' ? 'Transfer' : t.travel ? (tn(t.sub) || TRAVEL) : tn(t.category);
   if (!confirm(`Delete this entry?\n${t.type === 'income' ? '+' : t.type === 'transfer' ? '' : '−'}${money(t.amount)} · ${label}`)) return;
   tx = tx.filter(x => x.id !== id);
+  queue = queue.filter(o => !(o.op === 'update' && o.tx.id === id && o !== inflight));
   const i = queue.findIndex(o => o.op === 'add' && o.tx.id === id);
   if (i >= 0 && queue[i] !== inflight) queue.splice(i, 1);
   else queue.push({ op: 'delete', id });
@@ -283,22 +291,31 @@ function removeTx(id) {
 }
 
 /* ================= recent page ================= */
+function searchText(t, mp) {
+  const info = itemInfo(t, mp);
+  return [info.title, t.type, t.note, tn(t.category), tn(t.sub === TO_CASH ? 'Cash' : t.sub), t.method === 'cash' ? 'cash' : tn(t.account), String(t.amount), money(t.amount)]
+    .filter(Boolean).join(' ').toLowerCase();
+}
 function renderRecent() {
   const mp = maps();
-  const sorted = sortTx(tx);
+  const q = ui.q.trim().toLowerCase();
+  let sorted = sortTx(tx);
+  if (q) sorted = sorted.filter(t => searchText(t, mp).includes(q));
   const shown = sorted.slice(0, ui.recentN);
-  if (!shown.length) $('#recentList').innerHTML = '<div class="empty">No entries yet</div>';
-  else {
-    let html = '', cur = '';
+  if (!shown.length) {
+    $('#recentList').innerHTML = `<div class="card"><div class="empty">${q ? 'No matching entries' : 'No entries yet'}</div></div>`;
+  } else {
+    const groups = [];
     shown.forEach(t => {
-      if (t.date !== cur) {
-        cur = t.date;
-        const dayExp = sum(sorted.filter(x => x.date === cur && x.type === 'expense'));
-        html += `<div class="dayhead"><span>${esc(dateLabel(cur))}</span><span>${dayExp ? 'Spent ' + baht(dayExp) : ''}</span></div>`;
-      }
-      html += itemHTML(t, mp, false);
+      let g = groups[groups.length - 1];
+      if (!g || g.date !== t.date) { g = { date: t.date, items: [] }; groups.push(g); }
+      g.items.push(t);
     });
-    $('#recentList').innerHTML = html;
+    $('#recentList').innerHTML = groups.map(g => {
+      const dayExp = sum(sorted.filter(x => x.date === g.date && x.type === 'expense'));
+      return `<div class="list-head"><h2>${esc(dateLabel(g.date))}</h2><span>${!q && dayExp ? 'Spent ' + baht(dayExp) : ''}</span></div>
+        <div class="card list">${g.items.map(t => itemHTML(t, mp, false)).join('')}</div>`;
+    }).join('');
   }
   $('#recentMore').hidden = sorted.length <= shown.length;
 }
@@ -373,6 +390,10 @@ function periodOf(range, anchor) {
     const start = addDays(anchor, -diff);
     return { s: ymd(start), e: ymd(addDays(start, 6)), start };
   }
+  if (range === 'month') {
+    const y = anchor.getFullYear(), m = anchor.getMonth();
+    return { s: ymd(new Date(y, m, 1)), e: ymd(new Date(y, m + 1, 0)), y, m };
+  }
   const y = anchor.getFullYear();
   return { s: `${y}-01-01`, e: `${y}-12-31`, y };
 }
@@ -384,6 +405,7 @@ function periodLabel(range, p) {
     const left = a.getMonth() === b.getMonth() ? String(a.getDate()) : F_DM.format(a);
     return `${left} – ${F_DM.format(b)} ${F_Y.format(b)}`;
   }
+  if (range === 'month') return F_MONTH.format(new Date(p.y, p.m, 1));
   return String(p.y);
 }
 
@@ -391,6 +413,7 @@ function shiftAnchor(dir) {
   const a = ui.anchor;
   if (ui.range === 'day') ui.anchor = addDays(a, dir);
   else if (ui.range === 'week') ui.anchor = addDays(a, 7 * dir);
+  else if (ui.range === 'month') ui.anchor = new Date(a.getFullYear(), a.getMonth() + dir, 1);
   else ui.anchor = new Date(a.getFullYear() + dir, a.getMonth(), Math.min(a.getDate(), 28));
 }
 
@@ -422,6 +445,61 @@ function compHTML(rows, total) {
 function hbRow(name, v, max, cls) {
   const w = max ? Math.max(v / max * 100, v ? 2 : 0) : 0;
   return `<div class="brk"><div class="h"><span>${esc(name)}</span><span>${baht(v)}</span></div><div class="track"><i class="${cls}" style="width:${w}%"></i></div></div>`;
+}
+
+/* ---- monthly budget ---- */
+function budgets() {
+  const b = settings.budgets || {};
+  return { total: Number(b.total) || 0, cats: (b.cats && typeof b.cats === 'object') ? b.cats : {} };
+}
+function progHTML(name, spent, budget) {
+  const pct = budget ? spent / budget : 0;
+  const cls = pct > 1 ? 'over' : pct >= 0.8 ? 'warn' : 'ok';
+  const left = budget - spent;
+  const note = left >= 0 ? baht(left) + ' left' : baht(-left) + ' over';
+  return `<div class="brk"><div class="h"><span>${esc(name)}</span><span>${baht(spent)} / ${baht(budget)}</span></div>
+    <div class="track"><i class="p ${cls}" style="width:${Math.min(pct, 1) * 100}%"></i></div>
+    <div class="pnote ${cls}">${Math.round(pct * 100)}% used · ${esc(note)}</div></div>`;
+}
+function budgetNames() {
+  const names = settings.expense.map(x => parseItem(x).name).concat([TRAVEL]);
+  Object.keys(budgets().cats).forEach(k => { if (!names.includes(k)) names.push(k); });
+  return names;
+}
+function renderBudget(exp, expSum) {
+  const card = $('#budgetCard');
+  card.hidden = ui.range !== 'month';
+  if (card.hidden) return;
+  const b = budgets();
+  $('#budEdit').textContent = ui.budEdit ? 'Done' : 'Set budget';
+  if (ui.budEdit) {
+    const row = (label, key, val) => `<div class="brow"><div class="mid"><div class="t">${esc(label)}</div></div>
+      <input class="open-in" type="text" inputmode="decimal" autocomplete="off" placeholder="No limit" data-bud="${esc(key)}" value="${val || ''}" aria-label="Monthly budget for ${esc(label)}"></div>`;
+    $('#budBody').innerHTML = row('Total (all spending)', '__total__', b.total) + budgetNames().map(n => row(n, n, b.cats[n])).join('');
+    $('#budHint').textContent = 'Monthly limits in baht. Leave a field empty for no limit.';
+    return;
+  }
+  const spentBy = {};
+  exp.forEach(t => { const k = t.travel ? TRAVEL : (tn(t.category) || NONE); spentBy[k] = (spentBy[k] || 0) + t.amount; });
+  const rows = [];
+  if (b.total) rows.push(progHTML('Total', expSum, b.total));
+  Object.keys(b.cats).forEach(k => { if (Number(b.cats[k]) > 0) rows.push(progHTML(k, spentBy[k] || 0, Number(b.cats[k]))); });
+  $('#budBody').innerHTML = rows.length ? rows.join('') : '<div class="empty">No budget set yet</div>';
+  $('#budHint').textContent = rows.length ? '' : 'Tap “Set budget” to add monthly limits per category.';
+}
+function commitBudget() {
+  const cats = {};
+  let total = 0;
+  $$('#budBody input[data-bud]').forEach(i => {
+    const v = parseAmount(i.value);
+    if (i.dataset.bud === '__total__') total = v; else if (v > 0) cats[i.dataset.bud] = v;
+  });
+  settings = Object.assign({}, settings, { budgets: { total, cats } });
+  saveSettingsLocal();
+  queue = queue.filter(o => o.op !== 'saveSettings');
+  queue.push({ op: 'saveSettings', settings });
+  saveQueue();
+  sync();
 }
 
 function renderSummary() {
@@ -457,6 +535,14 @@ function renderSummary() {
           e: sum(exp.filter(x => x.date === k)), i: sum(inc.filter(x => x.date === k)) };
       });
       $('#chartTitle').textContent = 'Daily this week';
+    } else if (ui.range === 'month') {
+      const nd = new Date(p.y, p.m + 1, 0).getDate();
+      buckets = Array.from({ length: nd }, (_, i) => {
+        const d = new Date(p.y, p.m, i + 1), k = ymd(d), n = i + 1;
+        return { label: n === 1 || n % 5 === 0 ? String(n) : '', full: F_FULL.format(d), cur: k === t,
+          e: sum(exp.filter(x => x.date === k)), i: sum(inc.filter(x => x.date === k)) };
+      });
+      $('#chartTitle').textContent = 'Daily this month';
     } else {
       buckets = Array.from({ length: 12 }, (_, m) => {
         const pre = `${p.y}-${pad(m + 1)}`;
@@ -468,7 +554,7 @@ function renderSummary() {
       $('#chartTitle').textContent = 'Monthly this year';
     }
     const max = Math.max(1, ...buckets.map(b => Math.max(b.e, b.i)));
-    body.innerHTML = '<div class="chart">' + buckets.map(b => {
+    body.innerHTML = '<div class="chart' + (ui.range === 'month' ? ' dense' : '') + '">' + buckets.map(b => {
       const tip = `${b.full} · Spent ${baht(b.e)} · Income ${baht(b.i)}`;
       return `<button type="button" class="col${b.cur ? ' cur' : ''}" data-tip="${esc(tip)}" aria-label="${esc(tip)}">
         <div class="bars"><div class="bar e" style="height:${b.e / max * 100}%"></div><div class="bar i" style="height:${b.i / max * 100}%"></div></div>
@@ -477,6 +563,8 @@ function renderSummary() {
     $('#chartLegend').hidden = false;
     $('#chartTip').textContent = 'Tap a bar for details';
   }
+
+  renderBudget(exp, expSum);
 
   /* composition: category / payment method / travel */
   const has = exp.length > 0;
@@ -517,7 +605,7 @@ function renderSummary() {
       const sorted = sortTx(inRange);
       let html = '', cur = '';
       sorted.forEach(t => {
-        if (ui.range === 'week' && t.date !== cur) {
+        if ((ui.range === 'week' || ui.range === 'month') && t.date !== cur) {
           cur = t.date;
           const dayExp = sum(sorted.filter(x => x.date === cur && x.type === 'expense'));
           html += `<div class="dayhead"><span>${esc(F_FULL.format(parseYmd(cur)))}</span><span>${dayExp ? 'Spent ' + baht(dayExp) : ''}</span></div>`;
@@ -591,7 +679,8 @@ async function sync(manual) {
     const server = (res.tx || []).map(t => Object.assign({}, t, { amount: Number(t.amount) || 0, travel: Number(t.travel) || 0 }));
     const pendDel = new Set(queue.filter(o => o.op === 'delete').map(o => o.id));
     const ids = new Set(server.map(t => t.id));
-    tx = server.filter(t => !pendDel.has(t.id)).concat(queue.filter(o => o.op === 'add' && !ids.has(o.tx.id)).map(o => o.tx));
+    const pendUpd = new Map(queue.filter(o => o.op === 'update').map(o => [o.tx.id, o.tx]));
+    tx = server.filter(t => !pendDel.has(t.id)).map(t => pendUpd.has(t.id) ? Object.assign({}, pendUpd.get(t.id)) : t).concat(queue.filter(o => o.op === 'add' && !ids.has(o.tx.id)).map(o => o.tx));
     saveTx();
 
     const hasPendingSettings = queue.some(o => o.op === 'saveSettings');
@@ -616,6 +705,72 @@ async function sync(manual) {
     syncing = false;
     render();
   }
+}
+
+/* ================= edit entry ================= */
+let ed = null;
+const editMode = () => ed.travel ? 'travel' : ed.type;
+function openEdit(id) {
+  const t = tx.find(x => x.id === id); if (!t) return;
+  const cat = t.travel ? tn(t.sub) : tn(t.category);
+  ed = {
+    id, orig: t, type: t.type, travel: !!t.travel, amount: String(t.amount), date: t.date, note: t.note || '',
+    category: (cat === NONE || cat === TRAVEL && !t.travel) ? '' : (cat || ''),
+    acc: t.method === 'cash' ? CASH_KEY : tn(t.account),
+    from: t.method === 'cash' ? CASH_KEY : tn(t.account),
+    to: t.sub === TO_CASH ? CASH_KEY : tn(t.sub)
+  };
+  renderEdit();
+  $('#editSheet').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+function closeEdit() { $('#editSheet').hidden = true; document.body.style.overflow = ''; ed = null; }
+function chipRow(items, cur, attr) {
+  return `<div class="chips">` + items.map(i => `<button type="button" class="chip${i.v === cur ? ' on' : ''}" data-${attr}="${esc(i.v)}">${esc(i.n)}</button>`).join('') + '</div>';
+}
+function renderEdit() {
+  const mode = editMode();
+  $('#editSheet').className = 'sheet mode-' + mode;
+  $('#editTitle').textContent = 'Edit ' + mode;
+  const names = accountNames();
+  const accItems = names.map(n => ({ v: n, n })).concat([{ v: CASH_KEY, n: 'Cash' }]);
+  let html = `<div class="fld">Amount</div><input id="edAmt" class="edit-in big" type="text" inputmode="decimal" autocomplete="off" value="${esc(ed.amount)}" aria-label="Amount">`;
+  if (mode === 'transfer') {
+    const items = [{ v: CASH_KEY, n: 'Cash' }].concat(names.map(n => ({ v: n, n })));
+    [ed.from, ed.to].forEach(v => { if (v && v !== CASH_KEY && !names.includes(v)) items.push({ v, n: v }); });
+    html += `<div class="fld">From</div>` + chipRow(items, ed.from, 'efrom') + `<div class="fld">To</div>` + chipRow(items, ed.to, 'eto');
+  } else {
+    if (ed.acc && ed.acc !== CASH_KEY && !names.includes(ed.acc)) accItems.unshift({ v: ed.acc, n: ed.acc });
+    const list = listFor(mode).map(x => parseItem(x).name);
+    if (ed.category && !list.includes(ed.category)) list.push(ed.category);
+    html += `<div class="fld">${mode === 'travel' ? 'Travel type' : 'Category'}</div>` + chipRow(list.map(n => ({ v: n, n })), ed.category, 'ecat');
+    html += `<div class="fld">Paid / received via</div>` + chipRow(accItems, ed.acc, 'eacc');
+  }
+  html += `<div class="fld">Note</div><input id="edNote" class="edit-in" type="text" autocomplete="off" placeholder="Note (optional)" value="${esc(ed.note)}">
+    <div class="fld">Date</div><input id="edDate" class="edit-in" type="date" value="${esc(ed.date)}">`;
+  $('#editBody').innerHTML = html;
+}
+function saveEdit() {
+  const amt = parseAmount(ed.amount);
+  if (!(amt > 0)) { toast('Enter an amount first'); return; }
+  const mode = editMode();
+  const t = Object.assign({}, ed.orig, { amount: amt, date: ed.date || ed.orig.date, note: ed.note.trim() });
+  if (mode === 'transfer') {
+    if (!ed.from || !ed.to || ed.from === ed.to) { toast('Pick two different accounts'); return; }
+    t.method = ed.from === CASH_KEY ? 'cash' : 'account';
+    t.account = ed.from === CASH_KEY ? '' : ed.from;
+    t.sub = ed.to === CASH_KEY ? TO_CASH : ed.to;
+  } else {
+    t.method = ed.acc === CASH_KEY ? 'cash' : 'account';
+    t.account = t.method === 'cash' ? '' : ed.acc;
+    if (mode === 'travel') { t.category = TRAVEL; t.sub = ed.category; } else { t.category = ed.category || NONE; t.sub = ''; }
+  }
+  tx = tx.map(x => x.id === t.id ? t : x);
+  queueUpdate(t);
+  saveTx(); saveQueue();
+  closeEdit(); render();
+  toast('Saved changes');
+  sync();
 }
 
 /* ================= settings sheet ================= */
@@ -703,6 +858,7 @@ function showPage(name) {
   $('#pageTitle').textContent = TITLES[name];
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.page === name));
   if (name !== 'balance') ui.balEdit = false;
+  if (name !== 'summary') ui.budEdit = false;
   window.scrollTo(0, 0);
   render();
 }
@@ -752,6 +908,8 @@ $('#saveBtn').addEventListener('click', addEntry);
 document.addEventListener('click', e => {
   const d = e.target.closest('[data-del]');
   if (d) { removeTx(d.dataset.del); return; }
+  const it = e.target.closest('[data-edit]');
+  if (it) { openEdit(it.dataset.edit); return; }
   const t = e.target.closest('[data-tip]');
   if (t) {
     const card = t.closest('.card');
@@ -768,7 +926,7 @@ $('#detailToggle').addEventListener('click', () => {
 $$('.tabs button').forEach(b => b.addEventListener('click', () => showPage(b.dataset.page)));
 $('#rangeSeg').addEventListener('click', e => {
   const b = e.target.closest('button[data-range]'); if (!b) return;
-  ui.range = b.dataset.range; renderSummary();
+  ui.range = b.dataset.range; ui.budEdit = false; renderSummary();
 });
 $('#prevBtn').addEventListener('click', () => { shiftAnchor(-1); renderSummary(); });
 $('#nextBtn').addEventListener('click', () => { shiftAnchor(1); renderSummary(); });
@@ -794,6 +952,28 @@ $('#listEditors').addEventListener('click', e => {
     inp.addEventListener('blur', () => commitAdd(inp));
     add.replaceWith(inp); inp.focus();
   }
+});
+$('#recentSearch').addEventListener('input', e => { ui.q = e.target.value; ui.recentN = 50; renderRecent(); });
+$('#editBody').addEventListener('click', e => {
+  if (!ed) return;
+  const pick = (attr, key) => { const el = e.target.closest('[data-' + attr + ']'); if (!el) return false; ed[key] = el.dataset[attr]; return true; };
+  const cat = e.target.closest('[data-ecat]');
+  if (cat) { ed.category = ed.category === cat.dataset.ecat ? '' : cat.dataset.ecat; renderEdit(); return; }
+  if (pick('eacc', 'acc') || pick('efrom', 'from') || pick('eto', 'to')) renderEdit();
+});
+$('#editBody').addEventListener('input', e => {
+  if (!ed) return;
+  if (e.target.id === 'edAmt') { const v = e.target.value.replace(/[^\d.,]/g, ''); if (v !== e.target.value) e.target.value = v; ed.amount = v; }
+  else if (e.target.id === 'edNote') ed.note = e.target.value;
+  else if (e.target.id === 'edDate') ed.date = e.target.value;
+});
+$('#saveEdit').addEventListener('click', saveEdit);
+$('#closeEdit').addEventListener('click', closeEdit);
+$('#editBg').addEventListener('click', closeEdit);
+$('#budEdit').addEventListener('click', () => {
+  if (ui.budEdit) { commitBudget(); ui.budEdit = false; toast('Budget saved'); }
+  else ui.budEdit = true;
+  renderSummary();
 });
 $('#recentMore').addEventListener('click', () => { ui.recentN += 50; renderRecent(); });
 $('#balEdit').addEventListener('click', () => {
