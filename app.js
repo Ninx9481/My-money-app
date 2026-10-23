@@ -712,6 +712,141 @@ async function sync(manual) {
   }
 }
 
+/* ================= subscriptions ================= */
+const subsList = () => Array.isArray(settings.subs) ? settings.subs : [];
+const todayDate = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
+const daysUntil = ymdStr => Math.round((parseYmd(ymdStr) - todayDate()) / 86400000);
+function addMonthsDom(d, n, dom) {
+  const y = d.getFullYear(), m = d.getMonth() + n;
+  const last = new Date(y, m + 1, 0).getDate();
+  return new Date(y, m, Math.min(dom, last));
+}
+function dueText(days, next) {
+  if (days < 0) return 'Overdue ' + (-days) + (days === -1 ? ' day' : ' days');
+  if (days === 0) return 'Due today';
+  if (days === 1) return 'Tomorrow';
+  if (days <= 30) return 'in ' + days + ' days';
+  return F_DM.format(parseYmd(next));
+}
+const subAcc = v => v === CASH_KEY ? 'Cash' : (tn(v) || 'Account');
+const sortedSubs = () => subsList().slice().sort((a, b) => a.next.localeCompare(b.next));
+const dueSubs = () => sortedSubs().filter(x => x.remind >= 0 && daysUntil(x.next) <= x.remind);
+
+function renderSubs() {
+  const list = sortedSubs();
+  const monthly = list.reduce((s, x) => s + (x.cycle === 'year' ? x.amount / 12 : x.amount), 0);
+  $('#subMonth').textContent = baht(Math.round(monthly * 100) / 100) + ' / month';
+  $('#subYear').textContent = list.length ? baht(Math.round(monthly * 12 * 100) / 100) + ' / year · ' + list.length + (list.length === 1 ? ' subscription' : ' subscriptions') : '';
+  $('#subList').innerHTML = list.length ? list.map(x => {
+    const d = daysUntil(x.next);
+    const cls = d < 0 ? 'over' : d <= Math.max(x.remind, 0) && x.remind >= 0 ? 'soon' : '';
+    return `<div class="srow" data-sub="${esc(x.id)}">
+      <div class="mid"><div class="t">${esc(x.name)}</div>
+        <div class="s">${x.cycle === 'year' ? 'Yearly' : 'Monthly'} · ${esc(subAcc(x.acc))}${x.cat ? ' · ' + esc(x.cat) : ''}</div></div>
+      <div class="sr"><div class="sv">${baht(x.amount)}</div><div class="sd ${cls}">${esc(dueText(d, x.next))}</div></div>
+      <button type="button" class="paid" data-paid="${esc(x.id)}">Paid</button>
+    </div>`;
+  }).join('') : '<div class="empty">No subscriptions yet</div>';
+}
+
+function renderDue() {
+  const due = dueSubs();
+  const b = $('#dueBanner');
+  b.hidden = !due.length || ui.page !== 'entry';
+  $('#subsDot').hidden = !due.length;
+  if (due.length) {
+    const parts = due.slice(0, 2).map(x => x.name + ' · ' + dueText(daysUntil(x.next), x.next).toLowerCase());
+    b.textContent = parts.join('  |  ') + (due.length > 2 ? '  +' + (due.length - 2) + ' more' : '');
+  }
+}
+
+function saveSubs(arr) {
+  settings = Object.assign({}, settings, { subs: arr });
+  saveSettingsLocal();
+  queue = queue.filter(o => o.op !== 'saveSettings');
+  queue.push({ op: 'saveSettings', settings });
+  saveQueue();
+}
+
+function payNow(id) {
+  const x = subsList().find(q => q.id === id); if (!x) return;
+  const t = {
+    id: uid(), date: todayStr(), type: 'expense', amount: x.amount,
+    method: x.acc === CASH_KEY ? 'cash' : 'account', account: x.acc === CASH_KEY ? '' : x.acc,
+    category: x.cat || NONE, sub: '', note: x.name, travel: 0, createdAt: new Date().toISOString()
+  };
+  tx.push(t); queue.push({ op: 'add', tx: t }); saveTx();
+  const nextD = addMonthsDom(parseYmd(x.next), x.cycle === 'year' ? 12 : 1, x.dom || parseYmd(x.next).getDate());
+  saveSubs(subsList().map(q => q.id === id ? Object.assign({}, q, { next: ymd(nextD) }) : q));
+  render();
+  toast('Recorded ' + baht(x.amount) + ' · next ' + F_DM.format(nextD));
+  sync();
+}
+
+/* editor */
+let sb = null;
+function openSub(id) {
+  const x = id ? subsList().find(q => q.id === id) : null;
+  sb = x ? { id: x.id, name: x.name, amount: String(x.amount), cycle: x.cycle, next: x.next, acc: x.acc, cat: x.cat || '', remind: x.remind }
+         : { id: '', name: '', amount: '', cycle: 'month', next: todayStr(), acc: accountNames()[0] || CASH_KEY, cat: '', remind: 3 };
+  renderSubEditor();
+  $('#subTitle').textContent = x ? 'Edit subscription' : 'New subscription';
+  $('#subSheet').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+function closeSub() { $('#subSheet').hidden = true; document.body.style.overflow = ''; sb = null; }
+function renderSubEditor() {
+  const names = accountNames();
+  const accItems = names.map(n => ({ v: n, n })).concat([{ v: CASH_KEY, n: 'Cash' }]);
+  if (sb.acc && sb.acc !== CASH_KEY && !names.includes(sb.acc)) accItems.unshift({ v: sb.acc, n: sb.acc });
+  const cats = settings.expense.map(x => parseItem(x).name);
+  if (sb.cat && !cats.includes(sb.cat)) cats.push(sb.cat);
+  const rem = [[-1, 'No reminder'], [0, 'On the day'], [1, '1 day before'], [3, '3 days before'], [7, '7 days before']];
+  $('#subBody').innerHTML = `
+    <div class="fld">Name</div><input id="sbName" class="edit-in" type="text" autocomplete="off" placeholder="e.g. Netflix" value="${esc(sb.name)}">
+    <div class="fld">Amount</div><input id="sbAmt" class="edit-in big" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(sb.amount)}">
+    <div class="fld">Billing cycle</div>${chipRow([{ v: 'month', n: 'Monthly' }, { v: 'year', n: 'Yearly' }], sb.cycle, 'scycle')}
+    <div class="fld">Next payment date</div><input id="sbDate" class="edit-in" type="date" value="${esc(sb.next)}">
+    <div class="fld">Always paid with</div>${chipRow(accItems, sb.acc, 'sacc')}
+    <div class="fld">Category (optional)</div>${chipRow(cats.map(n => ({ v: n, n })), sb.cat, 'scat')}
+    <div class="fld">Remind me</div>${chipRow(rem.map(([v, n]) => ({ v: String(v), n })), String(sb.remind), 'srem')}
+    ${sb.id ? '<button type="button" class="ghost" id="sbCal">Add to Calendar (iPhone reminder)</button><button type="button" class="ghost danger" id="sbDel">Delete subscription</button>' : ''}`;
+}
+function saveSub() {
+  const amt = parseAmount(sb.amount), name = sb.name.trim();
+  if (!name) { toast('Enter a name'); return; }
+  if (!(amt > 0)) { toast('Enter an amount first'); return; }
+  if (!sb.next) { toast('Pick the next payment date'); return; }
+  const item = { id: sb.id || uid(), name, amount: amt, cycle: sb.cycle, next: sb.next, dom: parseYmd(sb.next).getDate(), acc: sb.acc, cat: sb.cat, remind: Number(sb.remind) };
+  saveSubs(sb.id ? subsList().map(q => q.id === sb.id ? item : q) : subsList().concat([item]));
+  closeSub(); render(); toast('Subscription saved'); sync();
+}
+function deleteSub() {
+  if (!confirm('Delete this subscription?\n' + sb.name)) return;
+  const id = sb.id;
+  saveSubs(subsList().filter(q => q.id !== id));
+  closeSub(); render(); toast('Deleted'); sync();
+}
+function downloadIcs() {
+  const x = subsList().find(q => q.id === sb.id); if (!x) return;
+  const p = n => String(n).padStart(2, '0');
+  const d = parseYmd(x.next);
+  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`;
+  const esc2 = t => String(t).replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Money//EN', 'BEGIN:VEVENT',
+    'UID:' + x.id + '@money-app', 'DTSTAMP:' + stamp + 'T000000Z', 'DTSTART:' + stamp + 'T090000', 'DURATION:PT30M',
+    'RRULE:FREQ=' + (x.cycle === 'year' ? 'YEARLY' : 'MONTHLY'),
+    'SUMMARY:' + esc2(x.name + ' payment (' + baht(x.amount) + ')'),
+    'DESCRIPTION:' + esc2('Paid with ' + subAcc(x.acc))];
+  if (x.remind >= 0) lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + esc2(x.name), 'TRIGGER:' + (x.remind === 0 ? 'PT0S' : '-P' + x.remind + 'D'), 'END:VALARM');
+  lines.push('END:VEVENT', 'END:VCALENDAR');
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = x.name.replace(/[^\w-]+/g, '_') + '.ics';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
 /* ================= edit entry ================= */
 let ed = null;
 const editMode = () => ed.travel ? 'travel' : ed.type;
@@ -856,12 +991,13 @@ function saveSettingsForm() {
 }
 
 /* ================= navigation / render ================= */
-const TITLES = { entry: 'Money', recent: 'Recent', summary: 'Summary', balance: 'Balance' };
+const TITLES = { entry: 'Money', subs: 'Subs', recent: 'Recent', summary: 'Summary', balance: 'Balance' };
 function showPage(name) {
   ui.page = name;
   Object.keys(TITLES).forEach(p => { $('#page-' + p).hidden = p !== name; });
   $('#pageTitle').textContent = TITLES[name];
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.page === name));
+  $('#recentBtn').classList.toggle('active', name === 'recent');
   if (name !== 'balance') ui.balEdit = false;
   if (name !== 'summary') ui.budEdit = false;
   window.scrollTo(0, 0);
@@ -870,8 +1006,10 @@ function showPage(name) {
 function render() {
   if (ui.page === 'entry') renderEntry();
   else if (ui.page === 'recent') renderRecent();
+  else if (ui.page === 'subs') renderSubs();
   else if (ui.page === 'balance') renderBalance();
   else renderSummary();
+  renderDue();
   if (!cfg.url) setSync('unset');
 }
 
@@ -959,6 +1097,33 @@ $('#listEditors').addEventListener('click', e => {
     add.replaceWith(inp); inp.focus();
   }
 });
+$('#recentBtn').addEventListener('click', () => showPage(ui.page === 'recent' ? 'entry' : 'recent'));
+$('#dueBanner').addEventListener('click', () => showPage('subs'));
+$('#subAdd').addEventListener('click', () => openSub(''));
+$('#subList').addEventListener('click', e => {
+  const p = e.target.closest('[data-paid]');
+  if (p) { payNow(p.dataset.paid); return; }
+  const r = e.target.closest('[data-sub]');
+  if (r) openSub(r.dataset.sub);
+});
+$('#subBody').addEventListener('click', e => {
+  if (!sb) return;
+  const set = (attr, key, conv) => { const el = e.target.closest('[data-' + attr + ']'); if (!el) return false; sb[key] = conv ? conv(el.dataset[attr]) : el.dataset[attr]; return true; };
+  if (e.target.id === 'sbDel') { deleteSub(); return; }
+  if (e.target.id === 'sbCal') { downloadIcs(); return; }
+  const cat = e.target.closest('[data-scat]');
+  if (cat) { sb.cat = sb.cat === cat.dataset.scat ? '' : cat.dataset.scat; renderSubEditor(); return; }
+  if (set('scycle', 'cycle') || set('sacc', 'acc') || set('srem', 'remind', Number)) renderSubEditor();
+});
+$('#subBody').addEventListener('input', e => {
+  if (!sb) return;
+  if (e.target.id === 'sbName') sb.name = e.target.value;
+  else if (e.target.id === 'sbAmt') { const v = e.target.value.replace(/[^\d.,]/g, ''); if (v !== e.target.value) e.target.value = v; sb.amount = v; }
+  else if (e.target.id === 'sbDate') sb.next = e.target.value;
+});
+$('#saveSub').addEventListener('click', saveSub);
+$('#closeSub').addEventListener('click', closeSub);
+$('#subBg').addEventListener('click', closeSub);
 $('#recentSearch').addEventListener('input', e => { ui.q = e.target.value; ui.recentN = 50; renderRecent(); });
 $('#editBody').addEventListener('click', e => {
   if (!ed) return;
@@ -1023,7 +1188,9 @@ function syncSegs() {
     if (!el.querySelector(':scope > .thumb')) { const th = document.createElement('span'); th.className = 'thumb'; el.prepend(th); }
     const btns = [...el.children].filter(c => c.tagName === 'BUTTON');
     el.style.setProperty('--n', btns.length);
-    el.style.setProperty('--i', Math.max(0, btns.findIndex(b => b.classList.contains('on'))));
+    const on = btns.findIndex(b => b.classList.contains('on'));
+    el.style.setProperty('--i', Math.max(0, on));
+    if (el.classList.contains('tabs')) el.classList.toggle('none-on', on < 0);
   });
 }
 let segRaf;

@@ -397,3 +397,29 @@ input, textarea { font: inherit; color: inherit; }
 .icon-btn:disabled { opacity: .3; pointer-events: none; }
 .today-pill { flex: none; margin-right: 6px; padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 700; color: var(--trv); background: color-mix(in srgb, var(--trv) 14%, var(--card)); border: 1px solid color-mix(in srgb, var(--trv) 35%, transparent); }
 .today-pill:active { transform: scale(.95); }
+
+/* ---------- header recent button / subscriptions ---------- */
+.top h1 { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-actions { flex: none; }
+.icon-btn.active { color: var(--trv); }
+#syncText { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabs.none-on .thumb { opacity: 0; }
+.tabs button { position: relative; }
+.tabs .dot { position: absolute; top: 6px; left: 54%; width: 9px; height: 9px; border-radius: 50%; background: var(--exp); border: 2px solid var(--card); box-sizing: content-box; }
+.banner.due { width: 100%; text-align: left; font-weight: 600; background: color-mix(in srgb, var(--exp) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--exp) 30%, transparent); }
+.srow { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.srow:last-child { border-bottom: 0; }
+.srow .mid { flex: 1; min-width: 0; }
+.srow .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srow .s { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srow .sr { text-align: right; }
+.srow .sv { font-weight: 700; font-variant-numeric: tabular-nums; }
+.srow .sd { font-size: 12px; color: var(--muted); }
+.srow .sd.soon { color: var(--s4); font-weight: 700; }
+.srow .sd.over { color: var(--exp); font-weight: 700; }
+.paid { padding: 7px 13px; border-radius: 99px; font-size: 13px; font-weight: 700; color: var(--trv); background: color-mix(in srgb, var(--trv) 14%, var(--card)); border: 1px solid color-mix(in srgb, var(--trv) 35%, transparent); }
+.paid:active { transform: scale(.95); }
+.ghost.danger { color: var(--exp); margin-left: 8px; }
+#subSheet { --mode: var(--trv); }
+#subSheet .chip { background: var(--card); }
+#subSheet .chip.on { background: linear-gradient(180deg, color-mix(in srgb, var(--mode) 26%, transparent), color-mix(in srgb, var(--mode) 12%, transparent)); }
