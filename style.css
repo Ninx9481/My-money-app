@@ -393,3 +393,7 @@ input, textarea { font: inherit; color: inherit; }
 #editSheet .chip.on { background: linear-gradient(180deg, color-mix(in srgb, var(--mode) 26%, transparent), color-mix(in srgb, var(--mode) 12%, transparent)); }
 #editSheet.mode-income { --mode: var(--inc); } #editSheet.mode-expense { --mode: var(--exp); }
 #editSheet.mode-travel { --mode: var(--trv); } #editSheet.mode-transfer { --mode: var(--trf); }
+
+.icon-btn:disabled { opacity: .3; pointer-events: none; }
+.today-pill { flex: none; margin-right: 6px; padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 700; color: var(--trv); background: color-mix(in srgb, var(--trv) 14%, var(--card)); border: 1px solid color-mix(in srgb, var(--trv) 35%, transparent); }
+.today-pill:active { transform: scale(.95); }

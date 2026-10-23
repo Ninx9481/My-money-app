@@ -409,8 +409,10 @@ function periodLabel(range, p) {
   return String(p.y);
 }
 
+const isCurrent = p => p.s <= todayStr() && todayStr() <= p.e;
 function shiftAnchor(dir) {
   const a = ui.anchor;
+  if (dir > 0 && isCurrent(periodOf(ui.range, a))) return;   // no peeking into the future
   if (ui.range === 'day') ui.anchor = addDays(a, dir);
   else if (ui.range === 'week') ui.anchor = addDays(a, 7 * dir);
   else if (ui.range === 'month') ui.anchor = new Date(a.getFullYear(), a.getMonth() + dir, 1);
@@ -512,6 +514,9 @@ function renderSummary() {
 
   $$('#rangeSeg button').forEach(b => b.classList.toggle('on', b.dataset.range === ui.range));
   $('#periodLabel').textContent = periodLabel(ui.range, p);
+  const cur = isCurrent(p);
+  $('#nextBtn').disabled = cur;
+  $('#todayBtn').hidden = cur;
   $('#sumInc').textContent = baht(incSum);
   $('#sumExp').textContent = baht(expSum);
   $('#sumNet').textContent = baht(net);
@@ -931,6 +936,7 @@ $('#rangeSeg').addEventListener('click', e => {
 $('#prevBtn').addEventListener('click', () => { shiftAnchor(-1); renderSummary(); });
 $('#nextBtn').addEventListener('click', () => { shiftAnchor(1); renderSummary(); });
 $('#periodLabel').addEventListener('click', () => { ui.anchor = new Date(); renderSummary(); });
+$('#todayBtn').addEventListener('click', () => { ui.anchor = new Date(); renderSummary(); });
 
 $('#settingsBtn').addEventListener('click', openSettings);
 $('#setupBtn').addEventListener('click', openSettings);
