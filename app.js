@@ -669,9 +669,19 @@ async function testConn() {
 }
 
 function saveSettingsForm() {
-  cfg.url = $('#cfgUrl').value.trim();
-  cfg.key = $('#cfgKey').value;
+  const newUrl = $('#cfgUrl').value.trim(), newKey = $('#cfgKey').value;
+  // Connecting (or reconnecting) to a sheet, e.g. after a fresh install: the app only has default lists
+  // at that point, so it must PULL the sheet's lists first instead of overwriting them.
+  const connChanged = newUrl !== cfg.url || newKey !== cfg.key;
+  cfg.url = newUrl;
+  cfg.key = newKey;
   saveCfg();
+  if (connChanged) {
+    closeSettings(); render();
+    toast(newUrl ? 'Connecting…' : 'Settings saved');
+    sync(true);
+    return;
+  }
   $$('.chip-input').forEach(commitAdd);
   settings = Object.assign({}, settings, cloneLists(draft));
   saveSettingsLocal();
