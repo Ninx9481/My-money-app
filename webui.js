@@ -78,7 +78,7 @@
   const tabBtns = {};
   TABS.forEach(([page, icon, label]) => {
     const b = h('button', { class: 'w-tab', onclick: () => act(page), 'aria-label': label });
-    b.append(svg(icon, false, 24), h('span', { class: 'tl' }), h('i', { class: 'dot', hidden: true }));
+    b.append(svg(icon, false, 24), h('span', { class: 'tl' }), h('i', { class: 'wdot', hidden: true }));
     tabBtns[page] = b; tabBar.appendChild(b);
   });
 
@@ -118,7 +118,7 @@
       const b = tabBtns[page];
       b.classList.toggle('on', m.page === page || (page === 'summary' && m.page === 'balance'));
       b.querySelector('.tl').textContent = L(label);
-      b.querySelector('.dot').hidden = !(page === 'subs' && m.due);
+      b.querySelector('.wdot').hidden = !(page === 'subs' && m.due);
     });
 
     // body
@@ -190,7 +190,7 @@
     alertEl.textContent = '';
     const btns = (a.buttons || []).slice();
     const box = h('div', { class: 'w-alert', role: 'alertdialog' }, h('h3', { text: a.title || '' }), a.message ? h('p', { text: a.message }) : null);
-    const row = h('div', { class: 'w-alert-btns' + (btns.length > 2 ? ' col' : '') });
+    const row = h('div', { class: 'w-alert-btns' + (btns.length > 2 ? ' wcol' : '') });
     btns.forEach(b => row.appendChild(h('button', {
       class: b.style === 'destructive' ? 'bad' : b.style === 'cancel' ? 'cancel' : 'main',
       text: b.title || L('OK'),
@@ -259,7 +259,7 @@
     if (e.setup || e.due) {
       wrap.appendChild(h('button', { class: 'w-banner', onclick: () => send('entry', e.setup ? 'setup' : 'due', 0), text: e.setup ? L('Not connected to Google Sheet yet — tap to set up') : e.due }));
     }
-    const card = h('div', { class: 'w-card entry' });
+    const card = h('div', { class: 'w-card wentry' });
     const modes = [['expense', 'Expense'], ['income', 'Income'], ['travel', 'Travel'], ['transfer', 'Transfer']];
     card.appendChild(seg(modes.map(([v, n]) => ({ v, n: L(n) })), e.mode, v => send('entry', 'mode', v), 'accent'));
     // amount
@@ -268,7 +268,7 @@
     const size = () => { amt.style.width = Math.max(4, (amt.value || amt.placeholder).length + 0.6) + 'ch'; };
     amt.addEventListener('input', () => { amt.value = amt.value.replace(/[^\d.,]/g, ''); size(); send('entry', 'amount', amt.value); });
     size();
-    card.appendChild(h('div', { class: 'w-amount-row' }, h('span', { class: 'baht', text: '฿' }), amt));
+    card.appendChild(h('div', { class: 'w-amount-row' }, h('span', { class: 'wbaht', text: '฿' }), amt));
     entryEl.amount = amt;
     if (e.mode === 'transfer') {
       const ends = e.ends || [];
@@ -341,7 +341,7 @@
     switch (t) {
       case 'hero': return h('div', { class: 'w-hero' },
         h('div', { class: 'small', text: r.small || '' }),
-        h('div', { class: 'big' + (r.neg ? ' neg' : '') }, r.big || '', r.unit ? h('small', { text: r.unit }) : null),
+        h('div', { class: 'wbig' + (r.neg ? ' neg' : '') }, r.big || '', r.unit ? h('small', { text: r.unit }) : null),
         r.sub ? h('div', { class: 'sub', text: r.sub }) : null);
       case 'empty': return h('div', { class: 'w-empty', text: r.text || '' });
       case 'note': return h('div', { class: 'w-note-t ' + (r.nk || ''), text: r.text || '' });
@@ -357,12 +357,12 @@
         r.today ? h('button', { class: 'w-today', text: L('Today'), onclick: () => send('screen', 'nav', 'today') }) : null,
         h('button', { class: 'w-round', disabled: r.next === false, 'aria-label': 'next', onclick: () => send('screen', 'nav', 'next') }, svg('right', false, 20)));
       case 'totals': return h('div', { class: 'w-totals' }, (r.items || []).map(it =>
-        h('div', { class: 'col' }, h('div', { class: 'l', text: it.l || '' }), h('div', { class: 'v ' + (it.k || ''), text: it.v || '' }))));
+        h('div', { class: 'wcol' }, h('div', { class: 'l', text: it.l || '' }), h('div', { class: 'v ' + (it.k || ''), text: it.v || '' }))));
       case 'bar': {
         const k = r.k || '';
         return h('div', { class: 'w-bar' },
-          h('div', { class: 'top' }, h('span', { class: 'n', text: r.title || '' }), h('span', { class: 'v', text: r.value || '' })),
-          h('div', { class: 'track' }, h('i', { class: 'k-' + k, style: 'width:' + Math.round(Math.min(1, Math.max(0, r.w || 0)) * 1000) / 10 + '%' })),
+          h('div', { class: 'wtop' }, h('span', { class: 'n', text: r.title || '' }), h('span', { class: 'v', text: r.value || '' })),
+          h('div', { class: 'wtrack' }, h('i', { class: 'k-' + k, style: 'width:' + Math.round(Math.min(1, Math.max(0, r.w || 0)) * 1000) / 10 + '%' })),
           r.note ? h('div', { class: 'note k-' + k, text: r.note }) : null);
       }
       case 'stack': return renderStack(r);
@@ -372,13 +372,13 @@
         const cb = h('input', { type: 'checkbox', class: 'w-switch', 'data-rid': id });
         cb.checked = !!r.on;
         cb.addEventListener('change', () => send('screen', 'toggle', { id, on: cb.checked }));
-        return h('label', { class: 'w-row' }, h('div', { class: 'mid' }, h('div', { class: 'ti', text: r.title || '' })), cb);
+        return h('label', { class: 'w-row' }, h('div', { class: 'wmid' }, h('div', { class: 'ti', text: r.title || '' })), cb);
       }
       case 'date': {
         const inp = h('input', { type: 'date', class: 'w-date inline', 'data-rid': id });
         inp.value = r.value || '';
         inp.addEventListener('change', () => send('screen', 'field', { id, v: inp.value }));
-        return h('label', { class: 'w-row' }, h('div', { class: 'mid' }, h('div', { class: 'ti', text: r.title || '' })), inp);
+        return h('label', { class: 'w-row' }, h('div', { class: 'wmid' }, h('div', { class: 'ti', text: r.title || '' })), inp);
       }
       case 'chips': return h('div', { class: 'w-chiprow' }, chipFlow((r.items || []).map(i => ({ v: i.v, n: i.n })), r.sel, v => send('screen', 'chip', { id, v }), r.sels));
       default: return renderMoneyRow(r, ctx);
@@ -391,7 +391,7 @@
     const inner = [];
     if (ctx.edit && r.del) inner.push(h('button', { class: 'w-minus', 'aria-label': L('Delete'), onclick: ev => { ev.stopPropagation(); send('screen', 'delete', r.del); } }, svg('x', false, 14)));
     if (r.icon) inner.push(h('span', { class: 'ic', text: r.icon }));
-    inner.push(h('div', { class: 'mid' }, h('div', { class: 'ti' + (r.light ? ' light' : ''), text: r.title || '' }), r.sub ? h('div', { class: 'su', text: r.sub }) : null));
+    inner.push(h('div', { class: 'wmid' }, h('div', { class: 'ti' + (r.light ? ' light' : ''), text: r.title || '' }), r.sub ? h('div', { class: 'su', text: r.sub }) : null));
     if (r.value != null || r.caption) {
       inner.push(h('div', { class: 'rt' }, r.value != null ? h('div', { class: 'va ' + fmtVk(r.vk), text: r.value }) : null,
         r.caption ? h('div', { class: 'ca ' + (r.ck || ''), text: r.caption }) : null));
@@ -407,7 +407,7 @@
         h('button', { disabled: i === 0, onclick: ev => { ev.stopPropagation(); send('screen', 'move', { key: r.move, from: i, to: i - 1 }); } }, svg('up', false, 16)),
         h('button', { disabled: i >= ctx.lastMove, onclick: ev => { ev.stopPropagation(); send('screen', 'move', { key: r.move, from: i, to: i + 1 }); } }, svg('down', false, 16))));
     }
-    if (r.chevron) inner.push(h('span', { class: 'chev' }, svg(r.chevron === 'up' ? 'up' : r.chevron === 'right' ? 'right' : 'down', false, 16)));
+    if (r.chevron) inner.push(h('span', { class: 'wchev' }, svg(r.chevron === 'up' ? 'up' : r.chevron === 'right' ? 'right' : 'down', false, 16)));
     inner.forEach(x => row.appendChild(x));
     if (r.tap) row.addEventListener('click', () => send('screen', 'row', id));
     if (!ctx.edit && r.del) return swipeRow(row, r.del);
@@ -439,7 +439,7 @@
     const id = r.id || '';
     const kb = r.kbd || 'text';
     const inp = h('input', {
-      class: 'w-field' + (r.big ? ' big' : ''), 'data-rid': id, placeholder: r.placeholder || '', autocomplete: 'off', autocapitalize: kb === 'text' ? 'sentences' : 'none',
+      class: 'w-field' + (r.big ? ' wbig' : ''), 'data-rid': id, placeholder: r.placeholder || '', autocomplete: 'off', autocapitalize: kb === 'text' ? 'sentences' : 'none',
       type: kb === 'secure' ? 'password' : kb === 'url' ? 'url' : kb === 'email' ? 'email' : 'text',
       inputmode: kb === 'decimal' ? 'decimal' : kb === 'number' ? 'numeric' : null
     });
@@ -465,7 +465,7 @@
     const bar = h('div', { class: 'w-stackbar' });
     parts.forEach(p => bar.appendChild(h('i', { style: 'flex:' + ((p.f || 0) / total) + ';background:' + colorOf(p) })));
     const leg = h('div', { class: 'w-legend' });
-    parts.forEach(p => leg.appendChild(h('div', { class: 'lg' }, h('i', { style: 'background:' + colorOf(p) }), h('span', { class: 'n', text: p.n || '' }), h('span', { class: 'p', text: (p.pct || 0) + '%' }), h('span', { class: 'v', text: p.v || '' }))));
+    parts.forEach(p => leg.appendChild(h('div', { class: 'wlg' }, h('i', { style: 'background:' + colorOf(p) }), h('span', { class: 'n', text: p.n || '' }), h('span', { class: 'wpc', text: (p.pct || 0) + '%' }), h('span', { class: 'v', text: p.v || '' }))));
     return h('div', { class: 'w-stack' }, bar, leg);
   }
 
@@ -473,15 +473,15 @@
   function renderChart(r) {
     const b = r.buckets || [];
     let max = 1; b.forEach(x => { max = Math.max(max, x.e || 0, x.i || 0); });
-    const tip = h('div', { class: 'tip', text: chartSel >= 0 && b[chartSel] ? b[chartSel].tip : L('Tap a bar for details') });
+    const tip = h('div', { class: 'wtip', text: chartSel >= 0 && b[chartSel] ? b[chartSel].tip : L('Tap a bar for details') });
     const plot = h('div', { class: 'w-plot' });
     b.forEach((x, k) => {
       const col = h('button', { class: 'bk' + (x.cur ? ' cur' : '') + (k === chartSel ? ' sel' : ''), onclick: () => { chartSel = chartSel === k ? -1 : k; tip.textContent = chartSel >= 0 ? b[k].tip : L('Tap a bar for details'); plot.querySelectorAll('.bk').forEach((el, j) => el.classList.toggle('sel', j === chartSel)); } },
-        h('div', { class: 'bars' }, h('i', { class: 'e', style: 'height:' + ((x.e || 0) / max * 100) + '%' }), h('i', { class: 'i', style: 'height:' + ((x.i || 0) / max * 100) + '%' })),
-        h('span', { class: 'lb', text: x.l || '' }));
+        h('div', { class: 'wbars' }, h('i', { class: 'we', style: 'height:' + ((x.e || 0) / max * 100) + '%' }), h('i', { class: 'wii', style: 'height:' + ((x.i || 0) / max * 100) + '%' })),
+        h('span', { class: 'wlb', text: x.l || '' }));
       plot.appendChild(col);
     });
-    const leg = h('div', { class: 'w-cleg' }, h('span', {}, h('i', { class: 'e' }), L('Expenses')), h('span', {}, h('i', { class: 'i' }), L('Income')));
+    const leg = h('div', { class: 'w-cleg' }, h('span', {}, h('i', { class: 'we' }), L('Expenses')), h('span', {}, h('i', { class: 'wii' }), L('Income')));
     return h('div', { class: 'w-chart' + (b.length > 14 ? ' dense' : '') }, plot, tip, leg);
   }
 
@@ -542,7 +542,7 @@
         const conf = h('input', { class: 'w-in', type: 'password', placeholder: '••••••••', autocomplete: 'new-password' });
         box.appendChild(lab('Email address')); box.appendChild(h('div', { class: 'w-inwrap' }, email));
         box.appendChild(lab('Password')); box.appendChild(h('div', { class: 'w-inwrap' }, pass, eye));
-        if (!isIn) { box.appendChild(lab('Confirm password')); box.appendChild(h('div', { class: 'w-inwrap' }, conf)); box.appendChild(h('div', { class: 'hint', text: 'ⓘ ' + L('At least 6 characters') })); }
+        if (!isIn) { box.appendChild(lab('Confirm password')); box.appendChild(h('div', { class: 'w-inwrap' }, conf)); box.appendChild(h('div', { class: 'whint', text: 'ⓘ ' + L('At least 6 characters') })); }
         else box.appendChild(h('button', { class: 'w-link forgot', text: L('Forgot password?'), onclick: () => send('auth', 'forgot', { email: email.value }) }));
         const msg = h('div', { class: 'w-auth-msg' });
         box.appendChild(msg);
@@ -558,7 +558,7 @@
           h('span', { class: 'g', html: '<svg viewBox="0 0 48 48" width="20" height="20"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.5 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.4 28.7A14.5 14.5 0 019.5 24c0-1.6.3-3.2.8-4.7l-7.8-6.1A24 24 0 000 24c0 3.9.9 7.5 2.6 10.8l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.7-4-13.6-9.8l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg>' }),
           h('span', { text: L('Continue with Google') }));
         box.appendChild(google);
-        box.appendChild(h('button', { class: 'w-link sw', onclick: () => send('auth', 'step', isIn ? 'up' : 'in') },
+        box.appendChild(h('button', { class: 'w-link wsw', onclick: () => send('auth', 'step', isIn ? 'up' : 'in') },
           isIn ? L("Don't have an account?") + ' ' : L('Already have an account?') + ' ', h('b', { text: isIn ? L('Register now') : L('Sign in') })));
         Object.assign(authForm, { email, pass, conf, msg, primary, google });
       }
