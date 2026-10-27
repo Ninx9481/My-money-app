@@ -1,9 +1,10 @@
 // Service worker: เก็บไฟล์แอพไว้ในเครื่อง เปิดได้แม้ออฟไลน์
 // ถ้าแก้ไฟล์แอพแล้วอัพโหลดใหม่ ให้เปลี่ยนเลข VERSION เพื่อบังคับอัปเดต
-const VERSION = 'v13';
+const VERSION = 'v59';
 const CACHE = 'money-app-' + VERSION;
 const FILES = [
-  './', './index.html', './style.css', './app.js',
+  './', './index.html', './style.css', './webui.css', './app.js', './webui.js', './i18n.js', './firebase.js',
+  './auth-google.png', './auth-icons.png',
   './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'
 ];
 
@@ -25,16 +26,11 @@ self.addEventListener('fetch', e => {
   // ไม่แตะคำขอไป Google Apps Script (ข้ามโดเมน) — ให้ไปเน็ตตรง ๆ
   if (req.method !== 'GET' || url.origin !== location.origin) return;
 
-  // stale-while-revalidate: ตอบจากแคชทันที แล้วอัปเดตแคชเบื้องหลัง
+  // network first (friends always get the newest version when online), cached copy when offline
   e.respondWith(
-    caches.open(CACHE).then(cache =>
-      cache.match(req, { ignoreSearch: true }).then(hit => {
-        const net = fetch(req).then(res => {
-          if (res && res.ok) cache.put(req, res.clone());
-          return res;
-        }).catch(() => hit);
-        return hit || net;
-      })
-    )
+    fetch(req).then(res => {
+      if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+      return res;
+    }).catch(() => caches.match(req, { ignoreSearch: true }).then(hit => hit || caches.match('./index.html')))
   );
 });

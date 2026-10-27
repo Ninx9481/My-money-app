@@ -1,7 +1,7 @@
 {
-  "name": "Money Tracker",
-  "short_name": "Money",
-  "description": "Track income and expenses with Google Sheets",
+  "name": "Lemoney",
+  "short_name": "Lemoney",
+  "description": "Simple expense tracker",
   "lang": "en",
   "start_url": "./index.html",
   "scope": "./",

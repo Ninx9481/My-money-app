@@ -423,3 +423,73 @@ input, textarea { font: inherit; color: inherit; }
 #subSheet { --mode: var(--trv); }
 #subSheet .chip { background: var(--card); }
 #subSheet .chip.on { background: linear-gradient(180deg, color-mix(in srgb, var(--mode) 26%, transparent), color-mix(in srgb, var(--mode) 12%, transparent)); }
+
+/* ---------- Face ID lock (native app only) ---------- */
+.lock { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: var(--bg); }
+.lock-card { width: min(300px, 80vw); text-align: center; }
+.lock-title { font-size: 40px; font-weight: 800; letter-spacing: -.5px; margin-bottom: 28px; }
+.lock .save { --mode: var(--trv); margin-top: 0; }
+
+/* ---------- back chevron, Recent without tab bar, native shell ---------- */
+.top-l { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.back-btn { margin-left: -10px; width: 36px; height: 36px; display: grid; place-items: center; color: var(--trv); border-radius: 50%; }
+body.on-recent .tabs { display: none; }
+body.on-recent #app { padding-bottom: calc(24px + var(--safe-b)); }
+body.native .top, body.native .tabs { display: none; }
+body.native #app { padding-bottom: calc(max(var(--tabh, 0px), var(--safe-b)) + 24px); }
+body.native { -webkit-user-select: none; user-select: none; }
+body.native input, body.native textarea { -webkit-user-select: text; user-select: text; }
+
+/* ---------- settings as a full page ---------- */
+body.on-settings .tabs { display: none; }
+body.on-settings #app { padding-bottom: calc(24px + var(--safe-b)); }
+body.on-recent #recentBtn, body.on-recent #settingsBtn, body.on-settings #recentBtn, body.on-settings #settingsBtn { display: none; }
+.set-card { padding: 4px 18px 18px; }
+#page-settings h3 { margin: 22px 0 8px; font-size: 14px; color: var(--muted); }
+.settings-foot { position: sticky; bottom: 0; padding: 12px 0 calc(10px + var(--safe-b)); background: linear-gradient(to bottom, transparent, var(--bg) 35%); }
+body.native.on-settings #app { padding-bottom: calc(24px + var(--safe-b)); }
+
+/* ---------- fixed Add page, scroll-away header, native top padding ---------- */
+body[data-page="entry"] { overflow: hidden; overscroll-behavior: none; }
+body[data-page="balance"] .top, body[data-page="summary"] .top { position: static; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+body.native #app { padding-top: var(--navh, 0px); }
+
+/* ---------- sheets never scroll sideways; credit-card plan rows ---------- */
+.sheet-body, .sheet-scroll { overflow-x: hidden; }
+.sheet-scroll { overscroll-behavior: contain; touch-action: pan-y; }
+.edit-in, .sheet input { box-sizing: border-box; max-width: 100%; min-width: 0; -webkit-appearance: none; appearance: none; }
+input[type="date"].edit-in { display: block; width: 100%; min-height: 46px; text-align: left; }
+.plan-fill { display: flex; gap: 8px; align-items: center; }
+.plan-fill .edit-in { flex: 1; margin-top: 0; }
+.plan-fill .ghost { margin: 0; flex: none; }
+.plan { margin-top: 8px; display: grid; gap: 6px; }
+.plan-row { display: flex; align-items: center; gap: 10px; }
+.plan-row span { width: 26px; text-align: right; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.plan-row .edit-in { margin-top: 0; flex: 1; }
+/* subs page scrolls away like Balance/Summary; page only scrolls when it overflows */
+body[data-page="subs"] .top { position: static; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+body[data-page="subs"] #app { min-height: 0; }
+body.native #app { min-height: 0; }
+
+.bal-total b .per { font-size: 15px; font-weight: 600; letter-spacing: 0; color: var(--muted); }
+
+/* ---------- page transitions ---------- */
+@keyframes pg-fwd { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: none; } }
+@keyframes pg-back { from { opacity: 0; transform: translateX(-36px); } to { opacity: 1; transform: none; } }
+@keyframes pg-fade { from { opacity: 0; } to { opacity: 1; } }
+.page.in-fwd { animation: pg-fwd .36s cubic-bezier(.2, .8, .2, 1); }
+.page.in-back { animation: pg-back .36s cubic-bezier(.2, .8, .2, 1); }
+.page.in-fade { animation: pg-fade .22s ease-out; }
+@media (prefers-reduced-motion: reduce) { .page.in-fwd, .page.in-back, .page.in-fade { animation: none; } }
+
+/* ---------- sheet header button: X -> blue tick ---------- */
+#closeSub.confirm { background: #0a84ff; color: #fff; }
+body.native #subSheet .sheet-head { display: none; }
+body.native #subSheet .sheet-bg { background: var(--bg); animation: none; }
+body.native #subSheet .sheet-body { top: var(--navh, 0px); max-height: none; border-radius: 0; animation: none; }
+body.native #subSheet .sheet-scroll { padding-bottom: calc(24px + var(--safe-b)); flex: 1; }
+
+/* the iPhone app draws every page natively; the web pages only hold data, so they must never show through the glass bars */
+body.native .page { visibility: hidden; }
+body.native #editSheet, body.native #subSheet { visibility: hidden; }  /* native forms replace these web sheets; never show them through the glass bar */
+body.native .lock { visibility: hidden; }  /* the lock screen is drawn natively */

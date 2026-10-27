@@ -9,17 +9,23 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Money">
+<meta name="apple-mobile-web-app-title" content="Lemoney">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css">
-<title>Money</title>
+<link rel="stylesheet" href="webui.css">
+<title>Lemoney</title>
 </head>
 <body>
 <div id="app">
   <header class="top">
-    <h1 id="pageTitle">Money</h1>
+    <div class="top-l">
+      <button id="backBtn" class="back-btn" type="button" aria-label="Back" hidden>
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <h1 id="pageTitle">Lemoney</h1>
+    </div>
     <div class="top-actions">
       <button id="syncBtn" class="sync glass" type="button" aria-label="Sync data"><i id="syncDot"></i><span id="syncText">—</span></button>
       <button id="recentBtn" class="icon-btn glass" type="button" aria-label="Recent entries">
@@ -97,7 +103,7 @@
         <span id="subYear"></span>
       </div>
       <div class="card">
-        <div class="card-title"><span>Upcoming</span><button type="button" id="subAdd" class="link">+ Add subscription</button></div>
+        <div class="card-title"><span>Upcoming</span><button type="button" id="subAdd" class="link">+ Add</button></div>
         <div id="subList"></div>
       </div>
     </section>
@@ -109,6 +115,17 @@
       <button type="button" id="recentMore" class="ghost more" hidden>Show more</button>
     </section>
 
+    <!-- ========== Debts ========== -->
+    <section id="page-debts" class="page" hidden>
+      <div class="card">
+        <div class="card-title"><span>People</span></div>
+        <div id="debtList"></div>
+        <p class="hint">Add loans and split bills in the iPhone app.</p>
+      </div>
+    </section>
+
+    <section id="page-person" class="page" hidden></section>
+
     <!-- ========== Page 4: Balance ========== -->
     <section id="page-balance" class="page" hidden>
       <div class="card bal-total">
@@ -117,7 +134,7 @@
         <span id="balSub"></span>
       </div>
       <div class="card">
-        <div class="card-title"><span>Accounts &amp; cash</span><button type="button" id="balEdit" class="link">Set starting balance</button></div>
+        <div class="card-title"><span>Accounts &amp; cash</span></div>
         <div id="balList"></div>
         <p class="hint" id="balHint"></p>
       </div>
@@ -181,6 +198,72 @@
         <div id="detailBody" hidden><div id="detailList"></div></div>
       </div>
     </section>
+    <!-- ========== Page: Settings ========== -->
+    <section id="page-settings" class="page" hidden>
+      <div class="card set-card">
+      <h3>Appearance</h3>
+      <div class="fld">Theme</div>
+      <div class="seg" id="themeSeg">
+        <button type="button" data-theme="auto">Auto</button>
+        <button type="button" data-theme="light">Light</button>
+        <button type="button" data-theme="dark">Dark</button>
+      </div>
+      <p class="hint">Auto follows your iPhone. The iPhone status bar (clock, battery) always follows the iPhone's own appearance, so Auto keeps everything in sync.</p>
+      <div class="fld">Week starts on</div>
+      <div class="seg" id="weekSeg">
+        <button type="button" data-ws="1">Monday</button>
+        <button type="button" data-ws="0">Sunday</button>
+      </div>
+
+      <div id="nativeSettings" hidden>
+        <h3>iPhone app</h3>
+        <div class="fld">Face ID lock</div>
+        <div class="seg" id="faceSeg">
+          <button type="button" data-v="0">Off</button>
+          <button type="button" data-v="1">On</button>
+        </div>
+        <p class="hint">Ask for Face ID (or your passcode) when you open Balance or Summary. It stays unlocked until you leave the app for more than 30 seconds.</p>
+        <div class="fld">Subscription reminders</div>
+        <div class="seg" id="notifySeg">
+          <button type="button" data-v="0">Off</button>
+          <button type="button" data-v="1">On</button>
+        </div>
+        <p class="hint">Sends an iPhone notification at 9:00 before each subscription is due, using the reminder you set for it.</p>
+      </div>
+
+      <h3>Starting balances</h3>
+      <p class="hint">How much each account already held before your first entry here. Balance = starting balance + income − expenses.</p>
+      <div id="openList"></div>
+
+      <h3>Customize lists</h3>
+      <p class="hint">Tap × to remove an item, or + Add new to add one. Emoji in your Google Sheet lists are kept and shown next to entries, never in the pickers.</p>
+      <div id="listEditors">
+      <div class="fld">Accounts</div>
+      <div class="chips edit" id="edAccounts" data-key="accounts"></div>
+      <div class="fld">Expense categories</div>
+      <div class="chips edit" id="edExpense" data-key="expense"></div>
+      <div class="fld">Income categories</div>
+      <div class="chips edit" id="edIncome" data-key="income"></div>
+      <div class="fld">Travel types</div>
+      <div class="chips edit" id="edTravel" data-key="travel"></div>
+      <div class="fld">People (for Debts)</div>
+      <div class="chips edit" id="edPeople" data-key="people"></div>
+      </div>
+      <button type="button" id="resetLists" class="ghost">Reset lists to defaults</button>
+
+      <h3 id="connectSec">Connect Google Sheet</h3>
+      <p class="hint">Only needed the first time you open the app.</p>
+      <label class="fld">Web app URL (ends with /exec)
+        <input id="cfgUrl" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/.../exec">
+      </label>
+      <label class="fld">Secret key
+        <input id="cfgKey" type="password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Same as SECRET in Code.gs">
+      </label>
+      <button type="button" id="testBtn" class="ghost">Test connection</button>
+      <p id="testMsg" class="hint"></p>
+      </div>
+    </section>
+
   </main>
 
   <nav class="tabs glass" id="tabs">
@@ -196,6 +279,10 @@
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l12-4v4"/><circle cx="16.5" cy="13.5" r="1.2"/></svg>
       <span>Balance</span>
     </button>
+    <button type="button" data-page="debts">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M18 14.3c2 .8 3.5 2.8 3.5 5.7"/></svg>
+      <span>Debts</span>
+    </button>
     <button type="button" data-page="summary">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
       <span>Summary</span>
@@ -204,53 +291,6 @@
 </div>
 
 <!-- ========== Settings ========== -->
-<div id="sheet" class="sheet" hidden>
-  <div class="sheet-bg" id="sheetBg"></div>
-  <div class="sheet-body" role="dialog" aria-label="Settings">
-    <div class="sheet-head"><h2>Settings</h2><button type="button" id="closeSheet" class="icon-btn" aria-label="Close">✕</button></div>
-    <div class="sheet-scroll">
-      <h3>Connect Google Sheet</h3>
-      <label class="fld">Web app URL (ends with /exec)
-        <input id="cfgUrl" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/.../exec">
-      </label>
-      <label class="fld">Secret key
-        <input id="cfgKey" type="password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Same as SECRET in Code.gs">
-      </label>
-      <button type="button" id="testBtn" class="ghost">Test connection</button>
-      <p id="testMsg" class="hint"></p>
-
-      <h3>Appearance</h3>
-      <div class="fld">Theme</div>
-      <div class="seg" id="themeSeg">
-        <button type="button" data-theme="auto">Auto</button>
-        <button type="button" data-theme="light">Light</button>
-        <button type="button" data-theme="dark">Dark</button>
-      </div>
-      <p class="hint">Auto follows your iPhone. The iPhone status bar (clock, battery) always follows the iPhone's own appearance, so Auto keeps everything in sync.</p>
-      <div class="fld">Week starts on</div>
-      <div class="seg" id="weekSeg">
-        <button type="button" data-ws="1">Monday</button>
-        <button type="button" data-ws="0">Sunday</button>
-      </div>
-
-      <h3>Customize lists</h3>
-      <p class="hint">Tap × to remove an item, or + Add new to add one. Emoji in your Google Sheet lists are kept and shown next to entries, never in the pickers.</p>
-      <div id="listEditors">
-      <div class="fld">Accounts</div>
-      <div class="chips edit" id="edAccounts" data-key="accounts"></div>
-      <div class="fld">Expense categories</div>
-      <div class="chips edit" id="edExpense" data-key="expense"></div>
-      <div class="fld">Income categories</div>
-      <div class="chips edit" id="edIncome" data-key="income"></div>
-      <div class="fld">Travel types</div>
-      <div class="chips edit" id="edTravel" data-key="travel"></div>
-      </div>
-      <button type="button" id="resetLists" class="ghost">Reset lists to defaults</button>
-    </div>
-    <div class="sheet-foot"><button type="button" id="saveCfg" class="save">Save settings</button></div>
-  </div>
-</div>
-
 <!-- ========== Edit entry ========== -->
 <div id="editSheet" class="sheet" hidden>
   <div class="sheet-bg" id="editBg"></div>
@@ -267,11 +307,20 @@
   <div class="sheet-body" role="dialog" aria-label="Subscription">
     <div class="sheet-head"><h2 id="subTitle">New subscription</h2><button type="button" id="closeSub" class="icon-btn" aria-label="Close">✕</button></div>
     <div class="sheet-scroll" id="subBody"></div>
-    <div class="sheet-foot"><button type="button" id="saveSub" class="save">Save subscription</button></div>
+  </div>
+</div>
+
+<div id="lock" class="lock" hidden>
+  <div class="lock-card">
+    <div class="lock-title">Lemoney</div>
+    <button type="button" id="unlockBtn" class="save">Unlock</button>
   </div>
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="firebase.js"></script>
+<script src="webui.js"></script>
+<script src="i18n.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
