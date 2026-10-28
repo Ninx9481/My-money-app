@@ -74,6 +74,8 @@
   const send = (fn, kind, v) => { const c = $c(); if (c && c[fn]) c[fn](kind, v); };
   const act = name => { const c = $c(); if (c) c.act(name); };
 
+  const brand = h('div', { class: 'w-brand' }, h('span', { class: 'lg', text: 'L' }), h('div', null, h('b', { text: 'Lemoney' }), h('small', { text: 'Personal Wealth' })));
+  tabBar.appendChild(brand);
   const TABS = [['entry', 'plus', 'Add'], ['subs', 'repeat', 'Subs'], ['debts', 'people', 'Debts'], ['summary', 'chart', 'Summary']];
   const tabBtns = {};
   TABS.forEach(([page, icon, label]) => {
@@ -81,6 +83,8 @@
     b.append(svg(icon, false, 24), h('span', { class: 'tl' }), h('i', { class: 'wdot', hidden: true }));
     tabBtns[page] = b; tabBar.appendChild(b);
   });
+  const sideSet = h('button', { class: 'w-side-set', onclick: () => act('settings') }, svg('gear', false, 20), h('span', { class: 'sl' }));
+  tabBar.append(h('span', { class: 'w-grow' }), sideSet);
 
   let last = {}, lastPage = '', queued = null;
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -121,6 +125,7 @@
       b.querySelector('.wdot').hidden = !(page === 'subs' && m.due);
     });
 
+    sideSet.querySelector('.sl').textContent = L('Settings');
     // body
     const pageChanged = m.page !== lastPage;
     if (m.entry) {
