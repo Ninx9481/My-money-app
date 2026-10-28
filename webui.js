@@ -18,7 +18,7 @@
     'Quick search records…': 'ค้นหารายการ…', 'Search': 'ค้นหา', 'Record a transaction': 'บันทึกรายการ', 'Recurring commitments': 'รายการประจำ', 'Ledger / people': 'บัญชีลูกหนี้ / เจ้าหนี้', 'History': 'ประวัติ', 'Preferences': 'การตั้งค่า', 'Overview': 'ภาพรวม',
     'Today': 'วันนี้', 'Entries': 'รายการ', 'Spent': 'จ่าย', 'Net': 'สุทธิ', 'This month': 'เดือนนี้', 'this month': 'เดือนนี้', 'No spending yet this month': 'เดือนนี้ยังไม่มีรายจ่าย', 'Latest entries': 'รายการล่าสุด', 'See all': 'ดูทั้งหมด',
     '30-day trend': 'แนวโน้ม 30 วัน', 'Inflow': 'เงินเข้า', 'Outflow': 'เงินออก', 'Where your money is': 'เงินอยู่ที่ไหนบ้าง', 'Annual projection': 'ประมาณการรายปี', 'Based on your current plans': 'จากรายการประจำที่มี', 'Due in 30 days': 'ครบกำหนดใน 30 วัน', 'Payments': 'รายการ', 'Total': 'รวม', 'By category': 'ตามหมวดหมู่', 'People': 'บุคคล', 'You owe': 'คุณเป็นหนี้', 'Owed to you': 'ค้างรับ', 'All settled': 'เคลียร์หมดแล้ว',
-    'New entry': 'เพิ่มรายการ', 'Add': 'เพิ่ม', 'Subs': 'ประจำ', 'Debts': 'หนี้', 'Summary': 'สรุป', 'Expense': 'รายจ่าย', 'Income': 'รายรับ', 'Travel': 'เดินทาง',
+    'New entry': 'เพิ่มรายการ', 'Recent': 'ล่าสุด', 'Add': 'เพิ่ม', 'Subs': 'ประจำ', 'Debts': 'หนี้', 'Summary': 'สรุป', 'Expense': 'รายจ่าย', 'Income': 'รายรับ', 'Travel': 'เดินทาง',
     'Transfer': 'โอนเงิน', 'Account': 'บัญชี', 'Cash': 'เงินสด', 'Amount': 'จำนวนเงิน', 'From': 'จาก', 'To': 'ถึง', 'Swap': 'สลับ', 'Today': 'วันนี้',
     'Unlock': 'ปลดล็อก', 'OK': 'ตกลง', 'Cancel': 'ยกเลิก', 'Sync data': 'ซิงก์ข้อมูล', 'Recent entries': 'รายการล่าสุด', 'Settings': 'ตั้งค่า',
     'Or sign in with': 'หรือเข้าสู่ระบบด้วย', 'Or sign up with': 'หรือสมัครด้วย', 'Continue with Google': 'ดำเนินการต่อด้วย Google',
@@ -81,10 +81,10 @@
 
   const brand = h('div', { class: 'w-brand' }, h('span', { class: 'lg', text: 'L' }), h('div', null, h('b', { text: 'Lemoney' }), h('small', { text: 'Personal Wealth' })));
   tabBar.appendChild(brand);
-  const TABS = [['entry', 'plus', 'Add'], ['subs', 'repeat', 'Subs'], ['debts', 'people', 'Debts'], ['summary', 'chart', 'Summary']];
+  const TABS = [['entry', 'plus', 'Add'], ['subs', 'repeat', 'Subs'], ['debts', 'people', 'Debts'], ['summary', 'chart', 'Summary'], ['recent', 'clock', 'Recent']];
   const tabBtns = {};
   TABS.forEach(([page, icon, label]) => {
-    const b = h('button', { class: 'w-tab', onclick: () => act(page), 'aria-label': label });
+    const b = h('button', { class: 'w-tab t-' + page, onclick: () => act(page), 'aria-label': label });
     b.append(svg(icon, false, 24), h('span', { class: 'tl' }), h('i', { class: 'wdot', hidden: true }));
     tabBtns[page] = b; tabBar.appendChild(b);
   });
@@ -131,6 +131,7 @@
     });
 
     sideSet.querySelector('.sl').textContent = L('Settings');
+    sideSet.classList.toggle('on', String(m.page || '').indexOf('settings') === 0);
     try { renderDesk(m); } catch (e) { rail.textContent = ''; }
     // body
     main.dataset.page = m.page || '';
