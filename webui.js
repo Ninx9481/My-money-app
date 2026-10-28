@@ -127,6 +127,7 @@
 
     sideSet.querySelector('.sl').textContent = L('Settings');
     // body
+    main.dataset.page = m.page || '';
     const pageChanged = m.page !== lastPage;
     if (m.entry) {
       const k = JSON.stringify(m.entry);
@@ -277,17 +278,21 @@
     entryEl.amount = amt;
     if (e.mode === 'transfer') {
       const ends = e.ends || [];
-      card.appendChild(h('div', { class: 'w-label', text: L('From') }));
-      card.appendChild(chipFlow(ends, e.from, v => send('entry', 'from', v)));
-      card.appendChild(h('button', { class: 'w-swap', onclick: () => send('entry', 'swap', 0) }, svg('swap', false, 16), h('span', { text: L('Swap') })));
-      card.appendChild(h('div', { class: 'w-label', text: L('To') }));
-      card.appendChild(chipFlow(ends, e.to, v => send('entry', 'to', v)));
+      card.appendChild(h('div', { class: 'w-eg' },
+        h('div', { class: 'w-label', text: L('From') }),
+        chipFlow(ends, e.from, v => send('entry', 'from', v)),
+        h('button', { class: 'w-swap', onclick: () => send('entry', 'swap', 0) }, svg('swap', false, 16), h('span', { text: L('Swap') }))));
+      card.appendChild(h('div', { class: 'w-eg' },
+        h('div', { class: 'w-label', text: L('To') }),
+        chipFlow(ends, e.to, v => send('entry', 'to', v))));
     } else {
-      card.appendChild(h('div', { class: 'w-label', text: L(e.mode === 'income' ? 'Received in' : 'Paid / received via') }));
-      card.appendChild(seg([{ v: 'account', n: L('Account') }, { v: 'cash', n: L('Cash') }], e.method, v => send('entry', 'method', v)));
-      if ((e.accounts || []).length) card.appendChild(chipFlow(e.accounts.map(n => ({ v: n, n })), e.account, v => send('entry', 'account', v)));
-      card.appendChild(h('div', { class: 'w-label', text: e.catLabel }));
-      card.appendChild(chipFlow((e.cats || []).map(n => ({ v: n, n })), e.category, v => send('entry', 'category', v)));
+      card.appendChild(h('div', { class: 'w-eg' },
+        h('div', { class: 'w-label', text: L(e.mode === 'income' ? 'Received in' : 'Paid / received via') }),
+        seg([{ v: 'account', n: L('Account') }, { v: 'cash', n: L('Cash') }], e.method, v => send('entry', 'method', v)),
+        (e.accounts || []).length ? chipFlow(e.accounts.map(n => ({ v: n, n })), e.account, v => send('entry', 'account', v)) : null));
+      card.appendChild(h('div', { class: 'w-eg' },
+        h('div', { class: 'w-label', text: e.catLabel }),
+        chipFlow((e.cats || []).map(n => ({ v: n, n })), e.category, v => send('entry', 'category', v))));
     }
     const note = h('input', { class: 'w-note', type: 'text', placeholder: L('Note (optional)'), enterkeyhint: 'done', 'data-rid': 'note', autocomplete: 'off' });
     note.value = prevNote;
