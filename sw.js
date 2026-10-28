@@ -1,6 +1,6 @@
 // Service worker: เก็บไฟล์แอพไว้ในเครื่อง เปิดได้แม้ออฟไลน์
 // ถ้าแก้ไฟล์แอพแล้วอัพโหลดใหม่ ให้เปลี่ยนเลข VERSION เพื่อบังคับอัปเดต
-const VERSION = 'v62';
+const VERSION = 'v63';
 const CACHE = 'money-app-' + VERSION;
 const FILES = [
   './', './index.html', './style.css', './webui.css', './app.js', './webui.js', './i18n.js', './firebase.js',
