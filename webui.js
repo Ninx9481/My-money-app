@@ -15,7 +15,10 @@
     'Welcome\nto Lemoney': 'ยินดีต้อนรับ\nสู่ Lemoney', 'At least 6 characters': 'อย่างน้อย 6 ตัวอักษร', "Passwords don't match": 'รหัสผ่านไม่ตรงกัน',
     'Note (optional)': 'โน้ต (ไม่บังคับ)', 'Not connected to Google Sheet yet — tap to set up': 'ยังไม่ได้เชื่อมต่อ — แตะเพื่อตั้งค่า',
     'Delete': 'ลบ', 'Back': 'กลับ', 'Close': 'ปิด', 'Save': 'บันทึก', 'Search note, category, amount': 'ค้นหาโน้ต หมวดหมู่ จำนวนเงิน',
-    'Add': 'เพิ่ม', 'Subs': 'ประจำ', 'Debts': 'หนี้', 'Summary': 'สรุป', 'Expense': 'รายจ่าย', 'Income': 'รายรับ', 'Travel': 'เดินทาง',
+    'Quick search records…': 'ค้นหารายการ…', 'Search': 'ค้นหา', 'Record a transaction': 'บันทึกรายการ', 'Recurring commitments': 'รายการประจำ', 'Ledger / people': 'บัญชีลูกหนี้ / เจ้าหนี้', 'History': 'ประวัติ', 'Preferences': 'การตั้งค่า', 'Overview': 'ภาพรวม',
+    'Today': 'วันนี้', 'Entries': 'รายการ', 'Spent': 'จ่าย', 'Net': 'สุทธิ', 'This month': 'เดือนนี้', 'this month': 'เดือนนี้', 'No spending yet this month': 'เดือนนี้ยังไม่มีรายจ่าย', 'Latest entries': 'รายการล่าสุด', 'See all': 'ดูทั้งหมด',
+    '30-day trend': 'แนวโน้ม 30 วัน', 'Inflow': 'เงินเข้า', 'Outflow': 'เงินออก', 'Where your money is': 'เงินอยู่ที่ไหนบ้าง', 'Annual projection': 'ประมาณการรายปี', 'Based on your current plans': 'จากรายการประจำที่มี', 'Due in 30 days': 'ครบกำหนดใน 30 วัน', 'Payments': 'รายการ', 'Total': 'รวม', 'By category': 'ตามหมวดหมู่', 'People': 'บุคคล', 'You owe': 'คุณเป็นหนี้', 'Owed to you': 'ค้างรับ', 'All settled': 'เคลียร์หมดแล้ว',
+    'New entry': 'เพิ่มรายการ', 'Add': 'เพิ่ม', 'Subs': 'ประจำ', 'Debts': 'หนี้', 'Summary': 'สรุป', 'Expense': 'รายจ่าย', 'Income': 'รายรับ', 'Travel': 'เดินทาง',
     'Transfer': 'โอนเงิน', 'Account': 'บัญชี', 'Cash': 'เงินสด', 'Amount': 'จำนวนเงิน', 'From': 'จาก', 'To': 'ถึง', 'Swap': 'สลับ', 'Today': 'วันนี้',
     'Unlock': 'ปลดล็อก', 'OK': 'ตกลง', 'Cancel': 'ยกเลิก', 'Sync data': 'ซิงก์ข้อมูล', 'Recent entries': 'รายการล่าสุด', 'Settings': 'ตั้งค่า',
     'Or sign in with': 'หรือเข้าสู่ระบบด้วย', 'Or sign up with': 'หรือสมัครด้วย', 'Continue with Google': 'ดำเนินการต่อด้วย Google',
@@ -55,7 +58,7 @@
     star: '<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/>', swap: '<path d="M8 4v16M8 4L4.5 7.5M8 4l3.5 3.5M16 20V4M16 20l-3.5-3.5M16 20l3.5-3.5"/>',
     eye: '<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
     eyeoff: '<path d="M3 3l18 18M10.6 6.2A9.5 9.5 0 0112 6c6.4 0 10 6 10 6a17 17 0 01-3.2 3.9M6.4 7.6A16.5 16.5 0 002 12s3.6 6.5 10 6.5c1.5 0 2.8-.3 4-.8"/>',
-    grip: '<path d="M8 9h8M8 15h8"/>'
+    grip: '<path d="M8 9h8M8 15h8"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'
   };
   const svg = (name, fill, size) => h('span', { class: 'wi', html: '<svg viewBox="0 0 24 24" width="' + (size || 22) + '" height="' + (size || 22) + '" fill="' + (fill ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[name] + '</svg>' });
 
@@ -69,7 +72,9 @@
   const authEl = h('div', { class: 'w-auth', hidden: true });
   const sheetEl = h('div', { class: 'w-sheet-wrap', hidden: true });
   const alertEl = h('div', { class: 'w-alert-wrap', hidden: true });
-  root.append(topBar, main, tabBar, sheetEl, authEl, alertEl, toastEl);
+  const pageHead = h('div', { class: 'w-ph' });
+  const rail = h('aside', { class: 'w-rail' });
+  root.append(topBar, pageHead, main, rail, tabBar, sheetEl, authEl, alertEl, toastEl);
   document.body.appendChild(root);
   const send = (fn, kind, v) => { const c = $c(); if (c && c[fn]) c[fn](kind, v); };
   const act = name => { const c = $c(); if (c) c.act(name); };
@@ -114,7 +119,7 @@
 
     // top bar
     const sheetOn = !!(m.form && m.sheet);
-    const barKey = JSON.stringify([m.title, m.back, m.page, m.sync, m.syncText, tabsShown(m)]);
+    const barKey = JSON.stringify([m.title, m.back, m.page, m.sync, m.syncText, tabsShown(m), m.lang]);
     if (barKey !== last.bar) { last.bar = barKey; renderTop(m); }
     // tab bar
     tabBar.classList.toggle('off', !m.tabs);
@@ -126,6 +131,7 @@
     });
 
     sideSet.querySelector('.sl').textContent = L('Settings');
+    try { renderDesk(m); } catch (e) { rail.textContent = ''; }
     // body
     main.dataset.page = m.page || '';
     const pageChanged = m.page !== lastPage;
@@ -183,7 +189,94 @@
       right.appendChild(h('button', { class: 'w-ib', 'aria-label': L('Recent entries'), onclick: () => act('recent') }, svg('clock')));
       right.appendChild(h('button', { class: 'w-ib', 'aria-label': L('Settings'), onclick: () => act('settings') }, svg('gear')));
     }
-    topBar.append(left, right);
+    const srch = h('label', { class: 'w-dsearch' }, svg('search', false, 18), h('input', { type: 'search', placeholder: L('Quick search records…'), 'aria-label': L('Search'),
+      onkeydown: e => { if (e.key === 'Enter' && e.target.value.trim()) { const q = e.target.value.trim(); e.target.value = ''; e.target.blur(); act('recent'); setTimeout(() => send('screen', 'search', q), 60); } } }));
+    topBar.append(left, srch, right);
+    pageHead.textContent = '';
+    if (sub) pageHead.appendChild(h('button', { class: 'w-ib', 'aria-label': L('Back'), onclick: () => act('back') }, svg('back')));
+    pageHead.appendChild(h('div', null, h('div', { class: 'eb', text: eyebrow(m) }), h('h1', { text: m.page === 'entry' ? L('New entry') : (m.title || 'Lemoney') })));
+  }
+  function eyebrow(m) {
+    const p = String(m.page || '');
+    const d = new Date().toLocaleDateString(isTh() ? 'th-TH-u-ca-gregory' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const k = p === 'entry' ? 'Record a transaction' : p === 'subs' ? 'Recurring commitments' : p === 'debts' ? 'Ledger / people' : p === 'recent' ? 'History' : p.indexOf('settings') === 0 ? 'Preferences' : 'Overview';
+    return L(k) + ' · ' + d;
+  }
+
+
+  /* ---------- desktop right rail (real data from app.js) ---------- */
+  const D = () => (typeof window.LMDATA === 'function' ? window.LMDATA() : null);
+  const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const card = (title, right, ...kids) => h('section', { class: 'w-rc' }, (title || right) ? h('div', { class: 'rh' }, h('b', { text: title || '' }), right || null) : null, ...kids);
+  const stat = (l, v, cls, sub) => h('div', { class: 'w-st' }, h('span', { class: 'l', text: l }), h('b', { class: cls || '', text: v }), sub ? h('small', { text: sub }) : null);
+  function trendSvg(vals, w, hgt) {
+    const mn = Math.min(...vals), mx = Math.max(...vals), span = (mx - mn) || 1, pad = 6;
+    const pts = vals.map((v, i) => [pad + (w - 2 * pad) * i / (vals.length - 1 || 1), hgt - pad - (hgt - 2 * pad) * (v - mn) / span]);
+    const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('');
+    const last = pts[pts.length - 1];
+    return h('div', { class: 'w-trend', html: '<svg viewBox="0 0 ' + w + ' ' + hgt + '" preserveAspectRatio="none"><defs><linearGradient id="wtg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--trv)" stop-opacity=".22"/><stop offset="1" stop-color="var(--trv)" stop-opacity="0"/></linearGradient></defs><path d="' + line + 'L' + (w - pad) + ' ' + hgt + 'L' + pad + ' ' + hgt + 'Z" fill="url(#wtg)"/><path d="' + line + '" fill="none" stroke="var(--trv)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg><i style="left:' + (last[0] / w * 100) + '%;top:' + (last[1] / hgt * 100) + '%"></i>' });
+  }
+  const PAL = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)'];
+  function share(items, fmt) {   // [{n, v}] -> stacked bar + legend
+    const tot = items.reduce((a, b) => a + b.v, 0) || 1;
+    const bar = h('div', { class: 'w-sbar' }); const lg = h('div', { class: 'w-slg' });
+    items.forEach((it, i) => {
+      bar.appendChild(h('i', { style: 'flex:' + Math.max(it.v / tot, .02) + ';background:' + PAL[i % PAL.length] }));
+      lg.appendChild(h('div', null, h('i', { style: 'background:' + PAL[i % PAL.length] }), h('span', { text: it.n }), h('b', { text: fmt(it.v) })));
+    });
+    return h('div', null, bar, lg);
+  }
+  function renderDesk(m) {
+    const p = String(m.page || '');
+    const d = D();
+    rail.textContent = '';
+    let any = false;
+    const add = el => { if (el) { rail.appendChild(el); any = true; } };
+    if (d && !m.auth) {
+      const B = d.baht, today = ymd(new Date()), mon = today.slice(0, 7);
+      const txs = d.tx;
+      const sum = (arr, ty) => arr.filter(t => t.type === ty).reduce((a, t) => a + t.amount, 0);
+      const monTx = txs.filter(t => String(t.date).slice(0, 7) === mon);
+      if (p === 'entry') {
+        const td = txs.filter(t => t.date === today);
+        add(card(L('Today'), null, h('div', { class: 'w-sts' }, stat(L('Entries'), String(td.length)), stat(L('Spent'), B(sum(td, 'expense')), 'exp'), stat(L('Income'), B(sum(td, 'income')), 'inc'))));
+        const cats = {}; monTx.filter(t => t.type === 'expense').forEach(t => { cats[t.category] = (cats[t.category] || 0) + t.amount; });
+        const top = Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 4);
+        const net = sum(monTx, 'income') - sum(monTx, 'expense');
+        add(card(L('This month'), null, h('div', { class: 'w-sts' }, stat(L('Income'), B(sum(monTx, 'income')), 'inc'), stat(L('Spent'), B(sum(monTx, 'expense')), 'exp'), stat(L('Net'), B(net), net < 0 ? 'exp' : 'inc')),
+          top.length ? share(top.map(([n, v]) => ({ n: tr(n), v })), B) : h('div', { class: 'w-rn', text: L('No spending yet this month') })));
+        const rec = txs.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 5);
+        add(card(L('Latest entries'), h('button', { class: 'lk', text: L('See all'), onclick: () => act('recent') }),
+          rec.length ? h('div', { class: 'w-rl' }, rec.map(t => h('div', null, h('span', { text: tr(t.category || (t.type === 'transfer' ? 'Transfer' : '')) + (t.note ? ' · ' + t.note : '') }), h('b', { class: t.type === 'income' ? 'inc' : t.type === 'expense' ? 'exp' : '', text: (t.type === 'income' ? '+' : t.type === 'expense' ? '−' : '') + d.money(t.amount) })))) : h('div', { class: 'w-rn', text: L('Nothing here yet') })));
+      } else if (p === 'balance' || p === 'summary') {
+        const total = d.bal.reduce((a, r) => a + r.bal, 0);
+        const days = []; for (let i = 29; i >= 0; i--) { const x = new Date(); x.setDate(x.getDate() - i); days.push(ymd(x)); }
+        const flow = {}; txs.forEach(t => { if (t.type === 'transfer') return; flow[t.date] = (flow[t.date] || 0) + (t.type === 'income' ? t.amount : -t.amount); });
+        const vals = []; let run = total; for (let i = days.length - 1; i >= 0; i--) { vals[i] = run; run -= (flow[days[i]] || 0); }
+        const first = vals[0], chg = total - first;
+        const inflow = sum(monTx, 'income'), outflow = sum(monTx, 'expense');
+        add(card(L('30-day trend'), h('span', { class: 'w-pill2 ' + (chg < 0 ? 'bad' : 'ok'), text: (chg >= 0 ? '+' : '−') + d.money(Math.abs(chg)) }),
+          trendSvg(vals, 300, 120), h('div', { class: 'w-axis' }, h('span', { text: days[0].slice(5) }), h('span', { text: L('Today') + ' · ' + B(total) })),
+          h('div', { class: 'w-sts two' }, stat(L('Inflow'), B(inflow), 'inc', L('this month')), stat(L('Outflow'), B(outflow), 'exp', L('this month')))));
+        const pos = d.bal.filter(r => r.bal > 0).sort((a, b) => b.bal - a.bal);
+        if (pos.length) add(card(L('Where your money is'), null, share(pos.slice(0, 5).map(r => ({ n: tr(r.name), v: r.bal })), B)));
+      } else if (p === 'subs') {
+        const subs = d.subs, mo = subs.reduce((a, x) => a + x.monthly, 0);
+        add(card(L('Annual projection'), null, h('div', { class: 'w-big2', text: B(Math.round(mo * 12)) }), h('div', { class: 'w-rn', text: L('Based on your current plans') })));
+        const next = subs.filter(x => x.days >= 0 && x.days <= 30);
+        add(card(L('Due in 30 days'), null, h('div', { class: 'w-sts two' }, stat(L('Payments'), String(next.length)), stat(L('Total'), B(next.reduce((a, x) => a + x.amt, 0)), 'exp')),
+          next.length ? h('div', { class: 'w-rl' }, next.slice(0, 5).map(x => h('div', null, h('span', { text: x.name }), h('b', { text: x.days === 0 ? L('Today') : x.days + 'd' })))) : null));
+        const cats = {}; subs.forEach(x => { const k = x.cat || 'Other'; cats[k] = (cats[k] || 0) + x.monthly; });
+        const top = Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        if (top.length) add(card(L('By category'), null, share(top.map(([n, v]) => ({ n: tr(n), v })), v => B(Math.round(v)))));
+      } else if (p === 'debts') {
+        const pe = d.people.filter(x => x.bal !== 0).sort((a, b) => Math.abs(b.bal) - Math.abs(a.bal));
+        const owed = pe.filter(x => x.bal > 0).reduce((a, x) => a + x.bal, 0), owe = -pe.filter(x => x.bal < 0).reduce((a, x) => a + x.bal, 0);
+        add(card(L('Overview'), null, h('div', { class: 'w-sts two' }, stat(L('Owed to you'), B(owed), 'inc'), stat(L('You owe'), B(owe), 'exp'))));
+        add(card(L('People'), null, pe.length ? h('div', { class: 'w-rl' }, pe.slice(0, 8).map(x => h('div', null, h('span', { text: x.name }), h('b', { class: x.bal > 0 ? 'inc' : 'exp', text: B(x.bal) })))) : h('div', { class: 'w-rn', text: L('All settled') })));
+      }
+    }
+    root.classList.toggle('has-rail', any);
   }
 
   /* ---------- toast / alert ---------- */
@@ -401,6 +494,10 @@
     const inner = [];
     if (ctx.edit && r.del) inner.push(h('button', { class: 'w-minus', 'aria-label': L('Delete'), onclick: ev => { ev.stopPropagation(); send('screen', 'delete', r.del); } }, svg('x', false, 14)));
     if (r.icon) inner.push(h('span', { class: 'ic', text: r.icon }));
+    else if (!ctx.edit && r.value != null && !r.chevron && r.title) {
+      let hs = 0; for (const ch of String(r.title)) hs = (hs * 31 + ch.charCodeAt(0)) % 6;
+      inner.push(h('span', { class: 'ic auto', style: '--av:var(--s' + (hs + 1) + ')', text: String(r.title).trim().slice(0, 1).toUpperCase() }));
+    }
     inner.push(h('div', { class: 'wmid' }, h('div', { class: 'ti' + (r.light ? ' light' : ''), text: r.title || '' }), r.sub ? h('div', { class: 'su', text: r.sub }) : null));
     if (r.value != null || r.caption) {
       inner.push(h('div', { class: 'rt' }, r.value != null ? h('div', { class: 'va ' + fmtVk(r.vk), text: r.value }) : null,

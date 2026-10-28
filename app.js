@@ -109,6 +109,12 @@ function trDeep(o, k) {
   return o;
 }
 window.T = T; window.curLang = curLang;
+// read-only snapshot for the web dashboard widgets (webui.js)
+window.LMDATA = () => ({
+  bal: balances().map(r => ({ name: r.name, bal: r.bal })), tx: tx.map(t => ({ date: t.date, type: t.type, amount: t.amount, category: t.category, note: t.note, method: t.method, account: t.account })),
+  subs: sortedSubs().map(x => ({ name: x.name, amt: curAmt(x), days: daysUntil(x.next), cat: x.cat || '', monthly: isCard(x) ? x.plan[0] : (x.cycle === 'year' ? x.amount / 12 : x.amount) })),
+  people: peopleStat().map(p => ({ name: p.name, bal: p.bal })), baht, money
+});
 const unT = v => (typeof v === 'string' && REV[v] !== undefined) ? REV[v] : v;
 let settings = Object.assign({}, DEFAULTS, LS.get('settings', {}));
 let tx = LS.get('tx', []);
