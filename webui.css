@@ -244,7 +244,7 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
   /* top bar: search + actions */
   .w-top { grid-column: 2 / -1; grid-row: 1; padding: 18px 40px 6px; gap: 20px; }
   .w-top .l { display: none; }
-  .w-dsearch { display: flex; align-items: center; gap: 10px; flex: 1; max-width: 420px; height: 44px; padding: 0 16px; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 1px var(--line); color: var(--muted); }
+  .w-dsearch { display: none !important; align-items: center; gap: 10px; flex: 1; max-width: 420px; height: 44px; padding: 0 16px; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 1px var(--line); color: var(--muted); }
   .w-dsearch input { flex: 1; border: 0; background: transparent; outline: none; font-size: 14px; min-width: 0; }
   .w-dsearch:focus-within { box-shadow: 0 0 0 2px var(--trv); }
   .w-top .r { margin-left: auto; }
@@ -311,7 +311,6 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
 
   /* controls */
   .w-seg { padding: 4px; border-radius: 14px; } .w-seg button { padding: 10px 14px; font-size: 14px; font-weight: 600; border-radius: 11px; }
-  .w-list > .w-sec:has(.w-seg) { max-width: 460px; }
   .w-list > .w-sec:has(.w-segrow) .w-group, .w-list > .w-sec:has(.w-nav) .w-group { background: transparent; box-shadow: none; }
   .w-totals { gap: 14px; } .w-totals .wcol { padding: 20px 16px; border-radius: 18px; text-align: left; box-shadow: 0 0 0 1px var(--line); } .w-totals .l { text-transform: uppercase; letter-spacing: .06em; font-size: 11px; } .w-totals .v { font-size: 24px; }
   .w-list > .w-sec:has(.w-chart, .w-stack) .w-group { border-radius: 22px; box-shadow: 0 0 0 1px var(--line); }
@@ -322,7 +321,7 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
   .w-entry { max-width: none; margin: 0; }
   .w-card.wentry { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 24px; align-items: stretch; border-radius: 24px; box-shadow: 0 0 0 1px var(--line), 0 1px 3px rgba(0,0,0,.03); }
   .w-card.wentry > .w-seg, .w-card.wentry > .w-amount-row, .w-card.wentry > .w-note-row, .w-card.wentry > .w-save { grid-column: 1 / -1; }
-  .w-card.wentry > .w-seg { max-width: 460px; background: var(--bg); }
+  .w-card.wentry > .w-seg { background: var(--bg); }
   .w-card.wentry > .w-seg button.on { background: var(--card); }
   .w-amount-row { justify-content: flex-start; align-items: center; background: color-mix(in srgb, var(--accent) 7%, var(--bg)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 20px; padding: 24px 30px; gap: 6px; }
   .w-amount-row .wbaht, .w-amount { font-size: 60px; line-height: 1.1; letter-spacing: -2px; }
