@@ -2239,7 +2239,7 @@ function summaryModel(colors) {
 const SETTINGS_LISTS = [['accounts', 'Accounts'], ['expense', 'Expense categories'], ['income', 'Income categories'], ['travel', 'Travel types'], ['people', 'People']];
 // pages inside Settings (iPhone app): [full name, short title shown in the top bar]
 const SET_SUBS = { open: ['Starting balances', 'Start balances'], accounts: ['Accounts', 'Accounts'], expense: ['Expense categories', 'Expenses'],
-  income: ['Income categories', 'Income'], travel: ['Travel types', 'Travel'], people: ['People', 'People'], cards: ['Credit cards', 'Cards'], connect: ['Google Sheet (old)', 'Google Sheet'], account: ['Account', 'Account'], backup: ['Backup & restore', 'Backup'], tax: ['Tax', 'Tax'], taxinc: ['Income categories', 'Income'] };
+  income: ['Income categories', 'Income'], travel: ['Travel types', 'Travel'], people: ['People', 'People'], cards: ['Credit cards', 'Cards'], appearance: ['Appearance', 'Appearance'], connect: ['Google Sheet (old)', 'Google Sheet'], account: ['Account', 'Account'], backup: ['Backup & restore', 'Backup'], tax: ['Tax', 'Tax'], taxinc: ['Income categories', 'Income'] };
 const settingsTitle = () => (ui.page === 'settings' && ui.settingsSub) ? SET_SUBS[ui.settingsSub][1] : (ui.page === 'summary' && ui.sumView === 'balance') ? 'Balance' : (ui.page === 'summary' && ui.sumView === 'goals') ? 'Goals' : (ui.page === 'person') ? personName() : (ui.page === 'goal') ? goalName() : TITLES[ui.page];
 function settingsModel(colors) {
   const secs = [];
@@ -2247,10 +2247,7 @@ function settingsModel(colors) {
   const base = { colors, nonce: screenNonce };
   if (!sub) {
     secs.push({ header: { title: 'Account' }, rows: [{ type: 'row', id: 'sub:account', tap: true, title: fbUser ? fbUser.email : 'Sign in or create account', value: '', vk: 'muted', chevron: 'right', light: true }] });
-    secs.push({ header: { title: 'Theme' }, footer: IOS ? "Auto follows your iPhone. The iPhone status bar (clock, battery) always follows the iPhone's own appearance, so Auto keeps everything in sync." : 'Auto follows your device.',
-      rows: [{ type: 'seg', id: 'theme', plain: true, sel: cfg.theme, items: segItems([['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']]) }] });
-    secs.push({ header: { title: 'Language' }, rows: [{ type: 'seg', id: 'lang', plain: true, sel: cfg.lang, items: segItems([['auto', 'Auto'], ['en', 'English'], ['th', 'ไทย']]) }] });
-    secs.push({ header: { title: 'Week starts on' }, rows: [{ type: 'seg', id: 'week', plain: true, sel: String(cfg.weekStart), items: segItems([['1', 'Monday'], ['0', 'Sunday']]) }] });
+    secs.push({ rows: [{ type: 'row', id: 'sub:appearance', tap: true, title: SET_SUBS.appearance[0], value: '', vk: 'muted', chevron: 'right', light: true }] });
     if (IOS) {
       secs.push({ header: { title: 'iPhone app' }, footer: 'Ask for Face ID (or your passcode) when you open Balance or Summary. It stays unlocked until you leave the app for more than 30 seconds.',
       rows: [{ type: 'switch', id: 'face', title: 'Face ID lock', on: !!cfg.faceLock }] });
@@ -2259,8 +2256,8 @@ function settingsModel(colors) {
     }
     const nav = (key, value) => ({ type: 'row', id: 'sub:' + key, tap: true, title: SET_SUBS[key][0], value, vk: 'muted', chevron: 'right', light: true });
     const nOpen = Object.keys(openingMap()).filter(k => Number(openingMap()[k])).length;
-    secs.push({ header: { title: 'Your data' }, rows: [nav('open', nOpen ? String(nOpen) : '')].concat(SETTINGS_LISTS.map(([key]) => nav(key, String((draft[key] || []).length)))) });
-    secs.push({ rows: [nav('cards', String(cardsList().length || '')), nav('tax', ''), nav('backup', '')] });
+    secs.push({ header: { title: 'Your data' }, rows: [nav('open', nOpen ? String(nOpen) : '')].concat(SETTINGS_LISTS.reduce((a, [key]) => { a.push(nav(key, String((draft[key] || []).length))); if (key === 'accounts') a.push(nav('cards', String(cardsList().length || ''))); return a; }, [])) });
+    secs.push({ rows: [nav('tax', ''), nav('backup', '')] });
     if (!fbUser) secs.push({ rows: [nav('connect', cfg.url ? 'Connected' : 'Not set')] });
     return Object.assign({ page: 'settings', sections: secs }, base);
   }
@@ -2272,6 +2269,13 @@ function settingsModel(colors) {
         value: String(r.key in openDraft ? openDraft[r.key] : (op[r.key] || '')) })) });
     secs.push({ rows: [{ type: 'button', id: 'reset', title: 'Reset starting balances', style: 'danger' }] });
     return Object.assign({ page: 'settings:open', sections: secs }, base);
+  }
+  if (sub === 'appearance') {
+    secs.push({ header: { title: 'Theme' }, footer: IOS ? "Auto follows your iPhone. The iPhone status bar (clock, battery) always follows the iPhone's own appearance, so Auto keeps everything in sync." : 'Auto follows your device.',
+      rows: [{ type: 'seg', id: 'theme', plain: true, sel: cfg.theme, items: segItems([['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']]) }] });
+    secs.push({ header: { title: 'Language' }, rows: [{ type: 'seg', id: 'lang', plain: true, sel: cfg.lang, items: segItems([['auto', 'Auto'], ['en', 'English'], ['th', 'ไทย']]) }] });
+    secs.push({ header: { title: 'Week starts on' }, rows: [{ type: 'seg', id: 'week', plain: true, sel: String(cfg.weekStart), items: segItems([['1', 'Monday'], ['0', 'Sunday']]) }] });
+    return Object.assign({ page: 'settings:appearance', sections: secs }, base);
   }
   if (sub === 'cards') {
     const rows = cardsList().map(c => ({ type: 'row', id: 'cd:' + c.id, tap: true, title: c.name, sub: 'Limit ' + baht(Number(c.limit) || 0) + (c.cutoff ? ' · cut-off day ' + c.cutoff : '') + (c.due ? ' · due day ' + c.due : ''), chevron: 'right' }));
