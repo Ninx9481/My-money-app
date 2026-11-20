@@ -251,6 +251,7 @@ const TH = {
 "Delete this installment plan?": "ลบรายการผ่อนนี้ไหม?",
 "Discard this installment plan?": "ไม่เพิ่มรายการผ่อนนี้ใช่ไหม?",
 "Appearance": "หน้าตา",
+"Paid with card": "จ่ายด้วยบัตร",
 "Subscription": "รายการประจำ",
 "New subscription": "รายการประจำใหม่",
 "Subscriptions cost": "ค่าใช้จ่ายประจำ",

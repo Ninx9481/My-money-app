@@ -1508,7 +1508,7 @@ function dueText(days, next) {
   if (days <= 30) return 'in ' + days + ' days';
   return F_DM.format(parseYmd(next));
 }
-const subAcc = v => v === CASH_KEY ? 'Cash' : (tn(v) || 'Account');
+const subAcc = v => v === CASH_KEY ? 'Cash' : (tn(acctLabel(v)) || 'Account');
 const sortedSubs = () => subsList().slice().sort((a, b) => a.next.localeCompare(b.next));
 const dueSubs = () => sortedSubs().filter(x => x.remind >= 0 && daysUntil(x.next) <= x.remind);
 
@@ -1689,7 +1689,7 @@ function openSub(id) {
   const x = id ? subsList().find(q => q.id === id) : null;
   sb = x ? { id: x.id, kind: subKind(x), name: x.name, amount: String(x.amount), cycle: x.cycle, next: x.next, acc: x.acc, cat: x.cat || '', remind: x.remind,
              plan: isCard(x) ? x.plan.map(String) : [''] }
-         : { id: '', kind: ui.billTab === 'bill' ? 'bill' : ui.billTab === 'card' ? 'card' : ui.billTab === 'sub' ? 'sub' : 'bill', name: '', amount: '', cycle: 'month', next: todayStr(), acc: accountNames()[0] || CASH_KEY, cat: '', remind: 3, plan: [''] };
+         : { id: '', kind: ui.billTab === 'bill' ? 'bill' : ui.billTab === 'card' ? 'card' : ui.billTab === 'sub' ? 'sub' : 'bill', name: '', amount: '', cycle: 'month', next: todayStr(), acc: (ui.billTab === 'card' && cardNames().length) ? CARD_PFX + cardNames()[0] : (accountNames()[0] || CASH_KEY), cat: '', remind: 3, plan: [''] };
   formSession++; subFillVal = '';
   renderSubEditor();
   $('#subSheet').hidden = false;
@@ -1725,7 +1725,7 @@ function renderSubEditor() {
 const CHECK_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 function subComplete() {
   if (!sb || !sb.name.trim() || !sb.next) return false;
-  if (sb.kind === 'card') return sb.plan.length > 0 && sb.plan.every(v => parseAmount(v) > 0);
+  if (sb.kind === 'card') return !!sb.acc && sb.plan.length > 0 && sb.plan.every(v => parseAmount(v) > 0);
   return parseAmount(sb.amount) > 0;
 }
 // X while the form is incomplete, a blue tick once it is complete (a native iOS button inside the iPhone app)
@@ -2852,8 +2852,9 @@ function editForm() {
 let subFillVal = '';
 function subForm() {
   const names = accountNames();
-  const accItems = names.map(n => ({ v: n, n })).concat([{ v: CASH_KEY, n: 'Cash' }]);
-  if (sb.acc && sb.acc !== CASH_KEY && !names.includes(sb.acc)) accItems.unshift({ v: sb.acc, n: sb.acc });
+  const cardItems = cardNames().map(n => ({ v: CARD_PFX + n, n }));
+  const accItems = sb.kind === 'card' ? cardItems.slice() : names.map(n => ({ v: n, n })).concat([{ v: CASH_KEY, n: 'Cash' }], cardItems);
+  if (sb.acc && !accItems.some(i => i.v === sb.acc)) accItems.unshift({ v: sb.acc, n: subAcc(sb.acc) });
   const cats = settings.expense.map(x => parseItem(x).name);
   if (sb.cat && !cats.includes(sb.cat)) cats.push(sb.cat);
   const rem = [[-1, 'No reminder'], [0, 'On the day'], [1, '1 day before'], [3, '3 days before'], [7, '7 days before']];
@@ -2872,7 +2873,7 @@ function subForm() {
     secs.push({ header: { title: 'Billing cycle' }, rows: [{ type: 'seg', id: 'scycle', sel: sb.cycle, items: segItems([['month', 'Monthly'], ['year', 'Yearly']]) }] });
   }
   secs.push({ header: { title: card ? 'Next installment date' : 'Next payment date' }, rows: [{ type: 'date', id: 'date', title: 'Date', value: sb.next }] });
-  secs.push({ header: { title: 'Always paid with' }, rows: [{ type: 'chips', id: 'sacc', sel: sb.acc, items: chipItems(accItems) }] });
+  secs.push({ header: { title: card ? 'Paid with card' : 'Always paid with' }, rows: accItems.length ? [{ type: 'chips', id: 'sacc', sel: sb.acc, items: chipItems(accItems) }] : [{ type: 'empty', text: 'Add a credit card in Settings first' }] });
   secs.push({ header: { title: 'Category (optional)' }, rows: [{ type: 'chips', id: 'scat', sel: sb.cat, items: chipItems(cats.map(n => ({ v: n, n }))) }] });
   secs.push({ header: { title: 'Remind me' }, rows: [{ type: 'chips', id: 'srem', sel: String(sb.remind), items: chipItems(rem.map(([v, n]) => ({ v: String(v), n }))) }] });
   if (sb.id) secs.push({ rows: [{ type: 'button', id: 'cal', title: 'Add to Calendar (iPhone reminder)' }, { type: 'button', id: 'del', title: 'Delete', style: 'danger' }] });
@@ -2888,7 +2889,11 @@ function formAction(kind, v) {
   if (df) { dfAction(kind, v); pushChrome(); return; }
   const o = (v && typeof v === 'object') ? v : {};
   if (sb && !$('#subSheet').hidden) {
-    if (kind === 'seg') { if (o.id === 'skind') sb.kind = o.v; else if (o.id === 'scycle') sb.cycle = o.v; renderSubEditor(); }
+    if (kind === 'seg') {
+      if (o.id === 'skind') { sb.kind = o.v; if (o.v === 'card') { if (!isCardAcct(sb.acc)) sb.acc = cardNames().length ? CARD_PFX + cardNames()[0] : ''; } else if (!sb.acc) sb.acc = accountNames()[0] || CASH_KEY; }
+      else if (o.id === 'scycle') sb.cycle = o.v;
+      renderSubEditor();
+    }
     else if (kind === 'chip') {
       if (o.id === 'sacc') sb.acc = o.v;
       else if (o.id === 'scat') sb.cat = sb.cat === o.v ? '' : o.v;
