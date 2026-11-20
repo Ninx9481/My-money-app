@@ -132,7 +132,7 @@ const ui = {
   anchor: new Date(),
   entriesOpen: LS.get('entriesOpen', false),
   from: '', to: '',
-  recentN: 50, q: '', budEdit: false, budDraft: {}, settingsSub: '',
+  recentN: 50, q: '', billTab: 'all', budEdit: false, budDraft: {}, settingsSub: '',
   balEdit: false,
   accOpen: false, catOpen: false,   // Add page: show every account / category, or only the starred ones
   debtView: 'person',   // Debts tab: By person | By item
@@ -1478,6 +1478,7 @@ const subAcc = v => v === CASH_KEY ? 'Cash' : (tn(v) || 'Account');
 const sortedSubs = () => subsList().slice().sort((a, b) => a.next.localeCompare(b.next));
 const dueSubs = () => sortedSubs().filter(x => x.remind >= 0 && daysUntil(x.next) <= x.remind);
 
+const subKind = x => (x.kind === 'card' && Array.isArray(x.plan) && x.plan.length > 0) ? 'card' : (x.kind === 'bill' ? 'bill' : 'sub');
 const isCard = x => x.kind === 'card' && Array.isArray(x.plan) && x.plan.length > 0;
 const curAmt = x => isCard(x) ? x.plan[0] : x.amount;
 function renderSubs() {
@@ -1523,11 +1524,15 @@ function saveSubs(arr) {
   saveQueue();
 }
 
-function payNow(id) {
+function payTap(id) {
   const x = subsList().find(q => q.id === id); if (!x) return;
-  const amt = curAmt(x);
+  if (x.kind === 'bill') openPayBill(id); else payNow(id);
+}
+function payNow(id, amtOv, dateOv) {
+  const x = subsList().find(q => q.id === id); if (!x) return;
+  const amt = amtOv > 0 ? amtOv : curAmt(x);
   const t = {
-    id: uid(), date: todayStr(), type: 'expense', amount: amt,
+    id: uid(), date: dateOv || todayStr(), type: 'expense', amount: amt,
     method: x.acc === CASH_KEY ? 'cash' : 'account', account: x.acc === CASH_KEY ? '' : x.acc,
     category: x.cat || NONE, sub: '', note: x.name, travel: 0, createdAt: new Date().toISOString()
   };
@@ -1542,19 +1547,43 @@ function payNow(id) {
     saveSubs(subsList().map(q => q.id === id ? Object.assign({}, q, { next: ymd(nextD), plan: rest, amount: rest[0] }) : q));
     render(); toast('Recorded ' + baht(amt) + ' · ' + rest.length + ' left · next ' + baht(rest[0]) + ' on ' + F_DM.format(nextD)); sync(); return;
   }
-  saveSubs(subsList().map(q => q.id === id ? Object.assign({}, q, { next: ymd(nextD) }) : q));
+  saveSubs(subsList().map(q => q.id === id ? Object.assign({}, q, { next: ymd(nextD) }, x.kind === 'bill' && amtOv > 0 ? { amount: amtOv } : {}) : q));
   render();
   toast('Recorded ' + baht(amt) + ' · next ' + F_DM.format(nextD));
   sync();
+}
+
+/* pay a bill: the real amount differs every month */
+let pf = null;
+function openPayBill(id) {
+  const x = subsList().find(q => q.id === id); if (!x) return;
+  pf = { id, name: x.name, est: x.amount, amount: String(x.amount), date: todayStr() };
+  formSession++; pushChrome();
+}
+function payForm() {
+  return { page: 'form-pay-' + formSession, colors: formColors('trv'), nonce: screenNonce, sections: [
+    { header: { title: 'Actual amount' }, footer: 'Estimate was ' + baht(pf.est) + '. Next month’s estimate becomes this amount.', rows: [{ type: 'field', id: 'pamt', big: true, kbd: 'decimal', value: pf.amount, placeholder: '0.00' }] },
+    { rows: [{ type: 'date', id: 'pdate', title: 'Paid on', value: pf.date }] }
+  ] };
+}
+const pfComplete = () => !!pf && parseAmount(pf.amount) > 0;
+function pfAction(kind, v) {
+  const o = (v && typeof v === 'object') ? v : {};
+  if (kind === 'field') { if (o.id === 'pamt') pf.amount = numOnly(String(o.v)); else if (o.id === 'pdate') pf.date = String(o.v); }
+}
+function paySheetAction() {
+  if (!pfComplete()) { pf = null; pushChrome(); return; }
+  const f = pf; pf = null;
+  payNow(f.id, parseAmount(f.amount), f.date);
 }
 
 /* editor */
 let sb = null;
 function openSub(id) {
   const x = id ? subsList().find(q => q.id === id) : null;
-  sb = x ? { id: x.id, kind: isCard(x) ? 'card' : 'sub', name: x.name, amount: String(x.amount), cycle: x.cycle, next: x.next, acc: x.acc, cat: x.cat || '', remind: x.remind,
+  sb = x ? { id: x.id, kind: subKind(x), name: x.name, amount: String(x.amount), cycle: x.cycle, next: x.next, acc: x.acc, cat: x.cat || '', remind: x.remind,
              plan: isCard(x) ? x.plan.map(String) : [''] }
-         : { id: '', kind: 'sub', name: '', amount: '', cycle: 'month', next: todayStr(), acc: accountNames()[0] || CASH_KEY, cat: '', remind: 3, plan: [''] };
+         : { id: '', kind: ui.billTab === 'bill' ? 'bill' : ui.billTab === 'card' ? 'card' : ui.billTab === 'sub' ? 'sub' : 'bill', name: '', amount: '', cycle: 'month', next: todayStr(), acc: accountNames()[0] || CASH_KEY, cat: '', remind: 3, plan: [''] };
   formSession++; subFillVal = '';
   renderSubEditor();
   $('#subSheet').hidden = false;
@@ -1569,14 +1598,14 @@ function renderSubEditor() {
   if (sb.cat && !cats.includes(sb.cat)) cats.push(sb.cat);
   const rem = [[-1, 'No reminder'], [0, 'On the day'], [1, '1 day before'], [3, '3 days before'], [7, '7 days before']];
   const card = sb.kind === 'card';
-  $('#subTitle').textContent = (sb.id ? 'Edit ' : 'New ') + (card ? 'credit card plan' : 'subscription');
+  $('#subTitle').textContent = (sb.id ? 'Edit ' : 'New ') + (card ? 'credit card plan' : sb.kind === 'bill' ? 'bill' : 'subscription');
   const planHtml = `<div class="fld">Installments left</div>
     <input id="sbN" class="edit-in" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 6" value="${sb.plan.length}">
     <div class="fld">Amount of each installment</div>
     <div class="plan-fill"><input id="sbFill" class="edit-in" type="text" inputmode="decimal" autocomplete="off" placeholder="Same amount for all"><button type="button" class="ghost" id="sbFillBtn">Fill all</button></div>
     <div class="plan">` + sb.plan.map((v, i) => `<div class="plan-row"><span>${i + 1}</span><input class="edit-in" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" data-plan="${i}" value="${esc(v)}" aria-label="Installment ${i + 1}"></div>`).join('') + `</div>`;
   $('#subBody').innerHTML = `
-    <div class="fld">Type</div>${chipRow([{ v: 'sub', n: 'Subscription' }, { v: 'card', n: 'Credit card' }], sb.kind, 'skind')}
+    <div class="fld">Type</div>${chipRow([{ v: 'bill', n: 'Bill' }, { v: 'sub', n: 'Subscription' }, { v: 'card', n: 'Credit card' }], sb.kind, 'skind')}
     <div class="fld">Name</div><input id="sbName" class="edit-in" type="text" autocomplete="off" placeholder="${card ? 'e.g. iPhone installment' : 'e.g. Netflix'}" value="${esc(sb.name)}">
     ${card ? planHtml : `<div class="fld">Amount</div><input id="sbAmt" class="edit-in big" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(sb.amount)}">
     <div class="fld">Billing cycle</div>${chipRow([{ v: 'month', n: 'Monthly' }, { v: 'year', n: 'Yearly' }], sb.cycle, 'scycle')}`}
@@ -1604,7 +1633,7 @@ function updateSubAction() {
 }
 async function subAction() {
   if (!sb) return;
-  const noun = sb.kind === 'card' ? 'credit card plan' : 'subscription';
+  const noun = sb.kind === 'card' ? 'credit card plan' : sb.kind === 'bill' ? 'bill' : 'subscription';
   if (subComplete()) {
     const r = await askAlert(sb.id ? 'Save changes?' : 'Add this ' + noun + '?', sb.name.trim(),
       [{ id: 'ok', title: sb.id ? 'Save' : 'Add', style: 'default' }, { id: 'discard', title: 'Discard', style: 'destructive' }, { id: 'keep', title: 'Keep editing', style: 'cancel' }]);
@@ -1616,7 +1645,7 @@ async function subAction() {
   }
 }
 function saveSub() {
-  const name = sb.name.trim();
+  const name = sb.name.trim(), sb0kind = sb.kind;
   if (!name) { toast('Enter a name'); return; }
   if (!sb.next) { toast('Pick the next payment date'); return; }
   let item;
@@ -1628,13 +1657,13 @@ function saveSub() {
   } else {
     const amt = parseAmount(sb.amount);
     if (!(amt > 0)) { toast('Enter an amount first'); return; }
-    item = { id: sb.id || uid(), name, amount: amt, cycle: sb.cycle, next: sb.next, dom: parseYmd(sb.next).getDate(), acc: sb.acc, cat: sb.cat, remind: Number(sb.remind) };
+    item = { id: sb.id || uid(), kind: sb.kind === 'bill' ? 'bill' : undefined, name, amount: amt, cycle: sb.cycle, next: sb.next, dom: parseYmd(sb.next).getDate(), acc: sb.acc, cat: sb.cat, remind: Number(sb.remind) };
   }
   saveSubs(sb.id ? subsList().map(q => q.id === sb.id ? item : q) : subsList().concat([item]));
-  closeSub(); render(); toast('Subscription saved'); sync();
+  closeSub(); render(); toast(sb0kind === 'bill' ? 'Bill saved' : 'Saved'); sync();
 }
 async function deleteSub() {
-  const r = await askAlert('Delete this ' + (sb.kind === 'card' ? 'credit card plan' : 'subscription') + '?', sb.name, [{ id: 'del', title: 'Delete', style: 'destructive' }, { id: 'no', title: 'Cancel', style: 'cancel' }]);
+  const r = await askAlert('Delete this ' + (sb.kind === 'card' ? 'credit card plan' : sb.kind === 'bill' ? 'bill' : 'subscription') + '?', sb.name, [{ id: 'del', title: 'Delete', style: 'destructive' }, { id: 'no', title: 'Cancel', style: 'cancel' }]);
   if (r !== 'del' || !sb) return;
   const id = sb.id;
   saveSubs(subsList().filter(q => q.id !== id));
@@ -1739,6 +1768,7 @@ async function editAction() {
 }
 function sheetAction() {
   if (lf) { listSheetAction(); return; }
+  if (pf) { paySheetAction(); return; }
   if (gf) { goalSheetAction(); return; }
   if (ie || df) { debtSheetAction(); return; }
   if (sb && !$('#subSheet').hidden) subAction();
@@ -1833,6 +1863,7 @@ function saveSettingsForm() {
 /* ---------- native bars bridge (iPhone app only) ---------- */
 function sheetInfo() {
   if (lf) return { title: 'Edit item', action: lfComplete() ? 'confirm' : 'close' };
+  if (pf) return { title: 'Pay ' + pf.name, action: pfComplete() ? 'confirm' : 'close' };
   if (gf) return { title: gf.id ? 'Edit goal' : 'New goal', action: gfComplete() ? 'confirm' : 'close' };
   if (ie) return { title: 'Edit item', action: ieComplete() ? 'confirm' : 'close' };
   if (df) return { title: dfTitle(), action: dfComplete() ? 'confirm' : 'close' };
@@ -2178,7 +2209,7 @@ async function showSubDetail(id) {
   if (isCard(x)) {
     const left = Math.round(x.plan.reduce((p, v) => p + v, 0) * 100) / 100;
     lines.push('Credit card · ' + x.plan.length + (x.plan.length === 1 ? ' payment left' : ' payments left'), 'Next installment  ' + baht(x.plan[0]), 'Total left  ' + baht(left));
-  } else lines.push((x.cycle === 'year' ? 'Yearly' : 'Monthly') + ' · ' + baht(x.amount));
+  } else lines.push((x.kind === 'bill' ? 'Bill · ' : '') + (x.cycle === 'year' ? 'Yearly' : 'Monthly') + ' · ' + (x.kind === 'bill' ? 'about ' : '') + baht(x.amount));
   lines.push('Paid with  ' + subAcc(x.acc));
   if (x.cat) lines.push('Category  ' + x.cat);
   lines.push('Next  ' + F_FULL.format(parseYmd(x.next)) + ' (' + dueText(d, x.next).toLowerCase() + ')');
@@ -2590,21 +2621,26 @@ function screenModel() {
   if (ui.page === 'profile') return profileModel(colors);
   if (ui.page === 'goal') return goalPageModel(colors);
   if (ui.page === 'subs') {
-    const list = sortedSubs();
-    const monthly = list.reduce((s, x) => s + (isCard(x) ? x.plan[0] : (x.cycle === 'year' ? x.amount / 12 : x.amount)), 0);
-    const cards = list.filter(isCard), subs = list.length - cards.length;
-    const left = cards.reduce((s, x) => s + x.plan.reduce((p, v) => p + v, 0), 0);
+    const all = sortedSubs(), tab = ui.billTab;
+    const list = tab === 'all' ? all : all.filter(x => subKind(x) === tab);
+    const eom = ymd(new Date(todayDate().getFullYear(), todayDate().getMonth() + 1, 0));
+    const dueNow = list.filter(x => x.next <= eom);
+    const total = dueNow.reduce((s, x) => s + curAmt(x), 0);
+    const cnt = k => dueNow.filter(x => subKind(x) === k).length;
     const parts = [];
-    if (subs) parts.push(subs + (subs === 1 ? ' subscription' : ' subscriptions'));
-    if (cards.length) parts.push(cards.length + (cards.length === 1 ? ' card plan' : ' card plans') + ' · ' + baht(Math.round(left * 100) / 100) + ' left');
+    if (cnt('bill')) parts.push(cnt('bill') + (cnt('bill') === 1 ? ' bill' : ' bills'));
+    if (cnt('sub')) parts.push(cnt('sub') + (cnt('sub') === 1 ? ' subscription' : ' subscriptions'));
+    if (cnt('card')) parts.push(cnt('card') + (cnt('card') === 1 ? ' card plan' : ' card plans'));
+    const small = tab === 'bill' ? 'Bills due this month' : tab === 'sub' ? 'Subscriptions due this month' : tab === 'card' ? 'Credit cards due this month' : 'Due this month';
+    const label = x => { const k = subKind(x); return k === 'card' ? 'Credit card · ' + x.plan.length + ' left' : (k === 'bill' ? 'Bill · ' : 'Subscription · ') + (x.cycle === 'year' ? 'Yearly' : 'Monthly'); };
     return { page: 'subs', colors, sections: [
-      { rows: [{ type: 'hero', small: 'Subscriptions cost', big: baht(Math.round(monthly * 100) / 100), unit: ' / month', sub: parts.join(' · ') }] },
+      { rows: [{ type: 'seg', id: 'btab', plain: true, sel: tab, items: segItems([['all', 'All'], ['bill', 'Bills'], ['sub', 'Subs'], ['card', 'Cards']]) }] },
+      { rows: [{ type: 'hero', small, big: baht(Math.round(total * 100) / 100), unit: '', sub: parts.length ? parts.join(' · ') : 'Nothing due this month' }] },
       { header: { title: 'Upcoming', action: { id: 'add', title: '+ Add' } },
         rows: list.length ? list.map(x => {
           const d = daysUntil(x.next);
-          const kind = isCard(x) ? 'Credit card · ' + x.plan.length + (x.plan.length === 1 ? ' payment left' : ' payments left') : (x.cycle === 'year' ? 'Yearly' : 'Monthly');
-          return { type: 'row', id: x.id, tap: true, title: x.name,
-            value: baht(curAmt(x)), caption: dueText(d, x.next), ck: d < 0 ? 'over' : (d <= Math.max(x.remind, 0) && x.remind >= 0 ? 'soon' : ''),
+          return { type: 'row', id: x.id, tap: true, title: x.name, sub: label(x) + ' · ' + subAcc(x.acc),
+            value: (x.kind === 'bill' ? '~' : '') + baht(curAmt(x)), caption: dueText(d, x.next), ck: d < 0 ? 'over' : (d <= Math.max(x.remind, 0) && x.remind >= 0 ? 'soon' : ''),
             button: { id: x.id, title: 'Paid' } };
         }) : [{ type: 'empty', text: 'Nothing here yet' }] }
     ] };
@@ -2639,6 +2675,7 @@ function formColors(accentKey) { const c = entryColors(); return Object.assign({
 function editComplete() { return !!ed && parseAmount(ed.amount) > 0; }
 function formModel() {
   if (lf) return listForm();
+  if (pf) return payForm();
   if (gf) return goalForm();
   if (ie) return itemForm();
   if (df) return debtForm();
@@ -2678,8 +2715,8 @@ function subForm() {
   const rem = [[-1, 'No reminder'], [0, 'On the day'], [1, '1 day before'], [3, '3 days before'], [7, '7 days before']];
   const card = sb.kind === 'card';
   const secs = [];
-  secs.push({ header: { title: 'Type' }, rows: [{ type: 'seg', id: 'skind', sel: sb.kind, items: segItems([['sub', 'Subscription'], ['card', 'Credit card']]) }] });
-  secs.push({ header: { title: 'Name' }, rows: [{ type: 'field', id: 'name', kbd: 'text', value: sb.name, placeholder: card ? 'e.g. iPhone installment' : 'e.g. Netflix' }] });
+  secs.push({ header: { title: 'Type' }, rows: [{ type: 'seg', id: 'skind', sel: sb.kind, items: segItems([['bill', 'Bill'], ['sub', 'Subscription'], ['card', 'Credit card']]) }] });
+  secs.push({ header: { title: 'Name' }, rows: [{ type: 'field', id: 'name', kbd: 'text', value: sb.name, placeholder: card ? 'e.g. iPhone installment' : sb.kind === 'bill' ? 'e.g. Electricity' : 'e.g. Netflix' }] });
   if (card) {
     secs.push({ header: { title: 'Installments left' }, rows: [{ type: 'field', id: 'n', lazy: true, kbd: 'number', value: String(sb.plan.length), placeholder: 'e.g. 6' }] });
     secs.push({ header: { title: 'Amount of each installment' }, rows: [
@@ -2687,7 +2724,7 @@ function subForm() {
       { type: 'button', id: 'fillall', title: 'Fill all' }
     ].concat(sb.plan.map((v, i) => ({ type: 'field', id: 'plan:' + i, title: String(i + 1), kbd: 'decimal', value: String(v), placeholder: '0.00' }))) });
   } else {
-    secs.push({ header: { title: 'Amount' }, rows: [{ type: 'field', id: 'amount', big: true, kbd: 'decimal', value: sb.amount, placeholder: '0.00' }] });
+    secs.push({ header: { title: sb.kind === 'bill' ? 'Estimated amount' : 'Amount' }, rows: [{ type: 'field', id: 'amount', big: true, kbd: 'decimal', value: sb.amount, placeholder: '0.00' }] });
     secs.push({ header: { title: 'Billing cycle' }, rows: [{ type: 'seg', id: 'scycle', sel: sb.cycle, items: segItems([['month', 'Monthly'], ['year', 'Yearly']]) }] });
   }
   secs.push({ header: { title: card ? 'Next installment date' : 'Next payment date' }, rows: [{ type: 'date', id: 'date', title: 'Date', value: sb.next }] });
@@ -2700,6 +2737,7 @@ function subForm() {
 
 function formAction(kind, v) {
   if (lf) { lfAction(kind, v); pushChrome(); return; }
+  if (pf) { pfAction(kind, v); pushChrome(); return; }
   if (gf) { gfAction(kind, v); pushChrome(); return; }
   if (ie) { ieAction(kind, v); pushChrome(); return; }
   if (df) { dfAction(kind, v); pushChrome(); return; }
@@ -2752,7 +2790,7 @@ function addDraftItem(key, raw) {
 }
 
 function screenAction(kind, v) {
-  if (lf || gf || ie || df || (sb && !$('#subSheet').hidden) || (ed && !$('#editSheet').hidden)) { formAction(kind, v); return; }
+  if (lf || pf || gf || ie || df || (sb && !$('#subSheet').hidden) || (ed && !$('#editSheet').hidden)) { formAction(kind, v); return; }
   const o = (v && typeof v === 'object') ? v : {};
   if (kind === 'row') {
     if (ui.page === 'subs') showSubDetail(v);
@@ -2777,7 +2815,7 @@ function screenAction(kind, v) {
       if (v === 'gedit') openGoalForm(ui.goal);
       else if (v === 'gdelp') deleteGoal(ui.goal);
     }
-    else if (ui.page === 'subs') payNow(v);
+    else if (ui.page === 'subs') payTap(v);
     else if (ui.page === 'recent') { if (v === 'more') { ui.recentN += 50; renderRecent(); } }
     else if (ui.page === 'profile') { if (v === 'rmphoto') setProfile({ photo: '' }); }
     else if (ui.page === 'person') { if (v === 'paidall') { const p = peopleStat().find(x => x.key === ui.person); if (p) openPayForm(p.entries.filter(e => !e.paid && isItem(e)).map(e => e.id)); } }
@@ -2810,7 +2848,8 @@ function screenAction(kind, v) {
   }
   else if (kind === 'search') { ui.q = String(v); ui.recentN = 50; renderRecent(); }
   else if (kind === 'seg') {
-    if (o.id === 'amode') { acct.mode = o.v === 'up' ? 'up' : 'in'; acct.msg = ''; }
+    if (o.id === 'btab') { ui.billTab = ['bill', 'sub', 'card'].includes(o.v) ? o.v : 'all'; render(); }
+    else if (o.id === 'amode') { acct.mode = o.v === 'up' ? 'up' : 'in'; acct.msg = ''; }
     else if (o.id === 'dview') { ui.debtView = o.v === 'item' ? 'item' : 'person'; render(); }
     else if (o.id === 'sumview') { ui.sumView = o.v === 'balance' ? 'balance' : o.v === 'goals' ? 'goals' : 'summary'; ui.budEdit = false; render(); }
     else if (o.id === 'range') { ui.range = o.v; ui.budEdit = false; renderSummary(); }
@@ -2897,7 +2936,7 @@ window.__chrome = {
 };
 
 /* ================= navigation / render ================= */
-const TITLES = { entry: 'Lemoney', subs: 'Subs', recent: 'Recent', summary: 'Summary', balance: 'Balance', debts: 'Debts', person: 'Person', settings: 'Settings', profile: 'Profile', goal: 'Goal' };
+const TITLES = { entry: 'Lemoney', subs: 'Bills', recent: 'Recent', summary: 'Summary', balance: 'Balance', debts: 'Debts', person: 'Person', settings: 'Settings', profile: 'Profile', goal: 'Goal' };
 const SUBPAGE = { recent: 1, settings: 1, person: 1, profile: 1, goal: 1 };   // full pages without the tab bar, with a back chevron
 function showPage(name) {
   const prevPage = ui.page;
