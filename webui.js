@@ -657,7 +657,7 @@
           const show = () => { nm.textContent = ''; nm.append(h('span', { text: r.name || '' }), pen); nameEdit = null; };
           const pen = h('button', { class: 'w-pen', 'aria-label': L('Edit name'), onclick: () => {
             const inp = h('input', { class: 'w-nameinp', type: 'text', value: r.raw || '', placeholder: L('Your name'), maxlength: '40', enterkeyhint: 'done' });
-            const commit = () => { send('screen', 'field', { id: r.editId, v: inp.value }); };
+            const commit = () => { const v = inp.value.trim(); r.raw = v; if (v) r.name = v; send('screen', 'field', { id: r.editId, v: inp.value }); show(); };
             const ok = h('button', { class: 'w-nameok', 'aria-label': L('Save'), onclick: commit }, svg('check', false, 18));
             const no = h('button', { class: 'w-nameno', 'aria-label': L('Cancel'), onclick: show }, svg('x', false, 18));
             inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape') show(); });
