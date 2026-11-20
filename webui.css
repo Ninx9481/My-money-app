@@ -499,3 +499,4 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
   .w-card.wentry > .w-seg + .w-eg, .w-card.wentry > .w-eg.wide { }
   .w-eg.wide { grid-column: 1 / -1; }
 }
+@media (min-width: 900px) { .w-card.wentry > .w-save { justify-self: center; } }
