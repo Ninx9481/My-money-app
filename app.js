@@ -716,6 +716,59 @@ function taxModel(base) {
   }
   return Object.assign({ page: 'settings:tax', sections: secs }, base);
 }
+/* ---- rename a list item / change its emoji (Settings → category, account, travel, people lists) ---- */
+let lf = null, renameQ = [];
+const EMOJI_PICKS = ['🍜', '☕', '🛒', '🏠', '💡', '🛍️', '💊', '🎬', '🎁', '📚', '🚇', '🚕', '⛽', '✈️', '🍺', '🎮', '🐶', '💼', '📈', '💰', '💳', '🏦', '🧾', '🧴'];
+const firstGlyph = str => { str = String(str || '').trim(); if (!str) return ''; try { const sg = new Intl.Segmenter(undefined, { granularity: 'grapheme' }); for (const x of sg.segment(str)) return x.segment; } catch (e) { /* older browsers */ } return Array.from(str)[0] || ''; };
+function openListEdit(sub, i) {
+  const raw = (draft[sub] || [])[i]; if (raw === undefined) return;
+  const it = parseItem(raw);
+  lf = { sub, i, orig: it.name, icon: it.icon, name: it.name };
+  formSession++; pushChrome();
+}
+function listForm() {
+  const secs = [
+    { header: { title: 'Emoji' }, footer: 'Pick one or type your own. Leave it empty for none.', rows: [
+      { type: 'field', id: 'lemoji', kbd: 'text', value: lf.icon, placeholder: '🙂' },
+      { type: 'chips', id: 'lemo', sel: lf.icon, items: EMOJI_PICKS.map(e => ({ v: e, n: e })) }] },
+    { header: { title: 'Name' }, footer: lf.orig !== lf.name.trim() ? 'Past entries keep the old name. Stars, budgets and tax settings follow the new one.' : '', rows: [{ type: 'field', id: 'lname', kbd: 'text', value: lf.name, placeholder: 'Name' }] }
+  ];
+  return { page: 'form-list-' + formSession, colors: formColors('trv'), nonce: screenNonce, sections: secs };
+}
+const lfNameTaken = () => (draft[lf.sub] || []).some((x, k) => k !== lf.i && parseItem(x).name.toLowerCase() === lf.name.trim().toLowerCase());
+const lfComplete = () => !!lf && lf.name.trim().length > 0 && !lfNameTaken();
+function lfAction(kind, v) {
+  const o = (v && typeof v === 'object') ? v : {};
+  if (kind === 'field') {
+    if (o.id === 'lname') lf.name = String(o.v);
+    else if (o.id === 'lemoji') { lf.icon = firstGlyph(o.v); }
+  } else if (kind === 'chip') { if (o.id === 'lemo') { lf.icon = lf.icon === o.v ? '' : String(o.v); formSession++; } }
+}
+function saveListEdit() {
+  if (!lfComplete()) { if (lf && lfNameTaken()) toast('Already in the list'); lf = null; pushChrome(); return; }
+  const name = lf.name.trim(), raw = (lf.icon ? lf.icon + ' ' : '') + name;
+  draft[lf.sub][lf.i] = raw;
+  if (name !== lf.orig) renameQ.push({ sub: lf.sub, from: lf.orig, to: name });
+  lf = null; render(); toast('Saved');
+}
+async function listSheetAction() {
+  if (lfComplete()) {
+    const r = await askAlert('Save this?', '', [{ id: 'ok', title: 'Save', style: 'default' }, { id: 'discard', title: 'Discard', style: 'destructive' }, { id: 'keep', title: 'Keep editing', style: 'cancel' }]);
+    if (r === 'ok') saveListEdit(); else if (r === 'discard') { lf = null; pushChrome(); }
+  } else { lf = null; pushChrome(); }
+}
+// names are used as keys in stars, budgets and the tax mapping: carry them over to the new name when the settings are saved
+function applyRenames(st) {
+  if (!renameQ.length) return st;
+  const out = Object.assign({}, st);
+  renameQ.forEach(({ sub, from, to }) => {
+    if (out.fav && Array.isArray(out.fav[sub]) && out.fav[sub].includes(from)) out.fav = Object.assign({}, out.fav, { [sub]: out.fav[sub].map(n => n === from ? to : n) });
+    if (sub === 'expense' && out.budgets && out.budgets.cats && from in out.budgets.cats) { const c = Object.assign({}, out.budgets.cats); c[to] = c[from]; delete c[from]; out.budgets = Object.assign({}, out.budgets, { cats: c }); }
+    if (sub === 'income' && out.tax && out.tax.map && from in out.tax.map) { const m = Object.assign({}, out.tax.map); m[to] = m[from]; delete m[from]; out.tax = Object.assign({}, out.tax, { map: m }); }
+  });
+  renameQ = [];
+  return out;
+}
 let gf = null;
 function openGoalForm(id) {
   const g = goalsList().find(x => x.id === id);
@@ -1676,6 +1729,7 @@ async function editAction() {
   }
 }
 function sheetAction() {
+  if (lf) { listSheetAction(); return; }
   if (gf) { goalSheetAction(); return; }
   if (ie || df) { debtSheetAction(); return; }
   if (sb && !$('#subSheet').hidden) subAction();
@@ -1703,7 +1757,7 @@ function commitAdd(inp) {
   else if (v) toast('Already in the list');
   renderEditor(key);
 }
-function fillLists(src) { draft = cloneLists(src); openDraft = {}; renderEditors(); renderOpenList(); }
+function fillLists(src) { draft = cloneLists(src); openDraft = {}; renameQ = []; renderEditors(); renderOpenList(); }
 function openSettings(toConnect) {
   $('#cfgUrl').value = cfg.url;
   $('#cfgKey').value = cfg.key;
@@ -1754,7 +1808,7 @@ function saveSettingsForm() {
   $$('.chip-input').forEach(commitAdd);
   const newLists = cloneLists(draft), newOpen = collectOpening();
   if (JSON.stringify([cloneLists(settings), openingMap()]) === JSON.stringify([newLists, newOpen])) { closeSettings(); return; }   // nothing changed
-  settings = Object.assign({}, settings, newLists, { opening: newOpen });
+  settings = applyRenames(Object.assign({}, settings, newLists, { opening: newOpen }));
   saveSettingsLocal();
   queue = queue.filter(o => o.op !== 'saveSettings');
   queue.push({ op: 'saveSettings', settings });
@@ -1769,6 +1823,7 @@ function saveSettingsForm() {
 
 /* ---------- native bars bridge (iPhone app only) ---------- */
 function sheetInfo() {
+  if (lf) return { title: 'Edit item', action: lfComplete() ? 'confirm' : 'close' };
   if (gf) return { title: gf.id ? 'Edit goal' : 'New goal', action: gfComplete() ? 'confirm' : 'close' };
   if (ie) return { title: 'Edit item', action: ieComplete() ? 'confirm' : 'close' };
   if (df) return { title: dfTitle(), action: dfComplete() ? 'confirm' : 'close' };
@@ -2086,12 +2141,12 @@ function settingsModel(colors) {
   // a list: drag the handles to reorder, tap − to remove
   const starable = sub === 'accounts' || sub === 'expense' || sub === 'income' || sub === 'travel';
   const rows = (draft[sub] || []).map((raw, i) => {
-    const r = { type: 'row', icon: parseItem(raw).icon, title: parseItem(raw).name, del: 'li:' + sub + ':' + i, move: sub };
+    const r = { type: 'row', id: 'ed:' + sub + ':' + i, tap: true, icon: parseItem(raw).icon, title: parseItem(raw).name, del: 'li:' + sub + ':' + i, move: sub };
     if (starable) r.button = { id: 'fav:' + sub + ':' + i, symbol: favOf(sub).includes(parseItem(raw).name) ? 'star.fill' : 'star', on: favOf(sub).includes(parseItem(raw).name) };
     return r;
   });
   rows.push({ type: 'field', id: 'add:' + sub, commit: true, kbd: 'text', placeholder: 'Add new…', value: '' });
-  secs.push({ footer: (starable ? 'Tap ★ to pin favorites: the Add page shows only starred ones, with a chevron to reveal the rest. ' : '') + 'Drag ≡ to change the order, tap − to remove. Emoji in your Google Sheet lists are kept and shown next to entries, never in the pickers.', rows });
+  secs.push({ footer: (starable ? 'Tap ★ to pin favorites: the Add page shows only starred ones, with a chevron to reveal the rest. ' : '') + 'Tap a name to change its name or emoji. Drag ≡ to change the order, tap − to remove. Emoji in your Google Sheet lists are kept and shown next to entries, never in the pickers.', rows });
   secs.push({ rows: [{ type: 'button', id: 'reset', title: 'Reset to defaults', style: 'danger' }] });
   return Object.assign({ page: 'settings:' + sub, sections: secs, edit: true }, base);
 }
@@ -2575,6 +2630,7 @@ let formSession = 0;
 function formColors(accentKey) { const c = entryColors(); return Object.assign({}, c, { accent: c[accentKey] || c.trv }); }
 function editComplete() { return !!ed && parseAmount(ed.amount) > 0; }
 function formModel() {
+  if (lf) return listForm();
   if (gf) return goalForm();
   if (ie) return itemForm();
   if (df) return debtForm();
@@ -2635,6 +2691,7 @@ function subForm() {
 }
 
 function formAction(kind, v) {
+  if (lf) { lfAction(kind, v); pushChrome(); return; }
   if (gf) { gfAction(kind, v); pushChrome(); return; }
   if (ie) { ieAction(kind, v); pushChrome(); return; }
   if (df) { dfAction(kind, v); pushChrome(); return; }
@@ -2687,7 +2744,7 @@ function addDraftItem(key, raw) {
 }
 
 function screenAction(kind, v) {
-  if (gf || ie || df || (sb && !$('#subSheet').hidden) || (ed && !$('#editSheet').hidden)) { formAction(kind, v); return; }
+  if (lf || gf || ie || df || (sb && !$('#subSheet').hidden) || (ed && !$('#editSheet').hidden)) { formAction(kind, v); return; }
   const o = (v && typeof v === 'object') ? v : {};
   if (kind === 'row') {
     if (ui.page === 'subs') showSubDetail(v);
@@ -2702,6 +2759,7 @@ function screenAction(kind, v) {
       else if (v === 'tax') { ui.viaProfile = true; openSettings('tax'); }
     }
     else if (ui.page === 'balance') showBalanceDetail(v);
+    else if (ui.page === 'settings' && String(v).startsWith('ed:')) { const em = String(v).match(/^ed:(\w+):(\d+)$/); if (em) openListEdit(em[1], Number(em[2])); }
     else if (ui.page === 'settings' && String(v).startsWith('sub:')) { ui.settingsSub = String(v).slice(4); if (!SET_SUBS[ui.settingsSub]) ui.settingsSub = ''; }
   }
   else if (kind === 'button') {

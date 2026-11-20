@@ -419,3 +419,13 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
 
 /* the three Income / Expenses / Balance tiles carry their own borders: no extra frame behind them */
 .w-list > .w-sec:has(.w-totals) .w-group, .w-group.bare { background: transparent !important; box-shadow: none !important; overflow: visible; border-radius: 0; }
+
+/* ---- list editor (categories, accounts…): slimmer rows; the up / down arrows sit side by side ---- */
+.w-row:has(.w-minus) { padding-top: 6px; padding-bottom: 6px; min-height: 46px; gap: 10px; }
+.w-sec .w-row:has(.w-minus) { padding-top: 6px; padding-bottom: 6px; min-height: 48px; }
+.w-row:has(.w-minus) .ic { font-size: 19px; width: 28px; height: 28px; border-radius: 8px; background: transparent; }
+.w-row:has(.w-minus) .ti { font-size: 15.5px; }
+.w-row:has(.w-minus) .w-move { flex-direction: row; }
+.w-row:has(.w-minus) .w-move button { padding: 6px 7px; }
+.w-row:has(.w-minus) .w-star { margin: 0 -2px; padding: 6px; }
+.w-row:has(.w-minus) .w-minus { width: 22px; height: 22px; }
