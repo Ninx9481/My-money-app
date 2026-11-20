@@ -18,7 +18,7 @@
     'Quick search records…': 'ค้นหารายการ…', 'Search': 'ค้นหา', 'Record a transaction': 'บันทึกรายการ', 'Recurring commitments': 'รายการประจำ', 'Ledger / people': 'บัญชีลูกหนี้ / เจ้าหนี้', 'History': 'ประวัติ', 'Preferences': 'การตั้งค่า', 'Overview': 'ภาพรวม',
     'Today': 'วันนี้', 'Entries': 'รายการ', 'Spent': 'จ่าย', 'Net': 'สุทธิ', 'This month': 'เดือนนี้', 'this month': 'เดือนนี้', 'No spending yet this month': 'เดือนนี้ยังไม่มีรายจ่าย', 'Latest entries': 'รายการล่าสุด', 'See all': 'ดูทั้งหมด',
     '30-day trend': 'แนวโน้ม 30 วัน', 'Inflow': 'เงินเข้า', 'Outflow': 'เงินออก', 'Where your money is': 'เงินอยู่ที่ไหนบ้าง', 'Annual projection': 'ประมาณการรายปี', 'Based on your current plans': 'จากรายการประจำที่มี', 'Due in 30 days': 'ครบกำหนดใน 30 วัน', 'Payments': 'รายการ', 'Total': 'รวม', 'By category': 'ตามหมวดหมู่', 'People': 'บุคคล', 'You owe': 'คุณเป็นหนี้', 'Owed to you': 'ค้างรับ', 'All settled': 'เคลียร์หมดแล้ว',
-    'New entry': 'เพิ่มรายการ', 'Recent': 'ล่าสุด', 'Add': 'เพิ่ม', 'Subs': 'ประจำ', 'Bills': 'บิล', 'Show more': 'แสดงเพิ่ม', 'Show less': 'แสดงน้อยลง', 'Debts': 'หนี้', 'Summary': 'สรุป', 'Expense': 'รายจ่าย', 'Income': 'รายรับ', 'Travel': 'เดินทาง',
+    'New entry': 'เพิ่มรายการ', 'Recent': 'ล่าสุด', 'Add': 'เพิ่ม', 'Subs': 'ประจำ', 'Bills': 'บิล', 'Show more': 'แสดงเพิ่ม', 'Paid via': 'จ่ายด้วย', 'Show less': 'แสดงน้อยลง', 'Debts': 'หนี้', 'Summary': 'สรุป', 'Expense': 'รายจ่าย', 'Income': 'รายรับ', 'Travel': 'เดินทาง',
     'Transfer': 'โอนเงิน', 'Account': 'บัญชี', 'Cash': 'เงินสด', 'Amount': 'จำนวนเงิน', 'From': 'จาก', 'To': 'ถึง', 'Swap': 'สลับ', 'Today': 'วันนี้',
     'Unlock': 'ปลดล็อก', 'OK': 'ตกลง', 'Cancel': 'ยกเลิก', 'Sync data': 'ซิงก์ข้อมูล', 'Recent entries': 'รายการล่าสุด', 'Settings': 'ตั้งค่า',
     'Or sign in with': 'หรือเข้าสู่ระบบด้วย', 'Or sign up with': 'หรือสมัครด้วย', 'Continue with Google': 'ดำเนินการต่อด้วย Google',
@@ -559,20 +559,18 @@
     entryEl.amount = amt;
     if (e.mode === 'transfer') {
       const ends = e.ends || [];
-      card.appendChild(h('div', { class: 'w-eg' },
-        h('div', { class: 'w-label', text: L('From') }),
-        chipFlow(ends, e.from, v => send('entry', 'from', v)),
-        h('button', { class: 'w-swap', onclick: () => send('entry', 'swap', 0) }, svg('swap', false, 16), h('span', { text: L('Swap') }))));
-      card.appendChild(h('div', { class: 'w-eg' },
-        h('div', { class: 'w-label', text: L('To') }),
-        chipFlow(e.toEnds || ends, e.to, v => send('entry', 'to', v))));
+      const swap = h('button', { class: 'w-swap', 'aria-label': L('Swap'), title: L('Swap'), onclick: () => send('entry', 'swap', 0) }, svg('swap', false, 18));
+      card.appendChild(h('div', { class: 'w-pair' },
+        h('div', { class: 'w-eg' }, h('div', { class: 'w-label', text: L('From') }), chipFlow(ends, e.from, v => send('entry', 'from', v))),
+        swap,
+        h('div', { class: 'w-eg' }, h('div', { class: 'w-label', text: L('To') }), chipFlow(e.toEnds || ends, e.to, v => send('entry', 'to', v)))));
     } else {
-      card.appendChild(h('div', { class: 'w-eg' },
-        h('div', { class: 'w-label', text: L(e.mode === 'income' ? 'Received in' : 'Paid / received via') }),
-        seg([{ v: 'account', n: L('Account') }, { v: 'cash', n: L('Cash') }].concat(e.cardOn ? [{ v: 'card', n: L('Credit card') }] : []), e.method, v => send('entry', 'method', v)),
-        e.method === 'card' ? ((e.cards || []).length ? chipFlow(e.cards.map(n => ({ v: n, n })), e.card, v => send('entry', 'card', v)) : h('div', { class: 'w-rn', text: L('Add a credit card in Settings first') })) :
-        (e.accounts || []).length ? chipFlow(e.accounts.map(n => ({ v: n, n })), e.account, v => send('entry', 'account', v)) : null));
-      card.appendChild(h('div', { class: 'w-eg' },
+      // how it was paid: the segmented control sits above the boxes, full width
+      card.appendChild(seg([{ v: 'account', n: L('Account') }, { v: 'cash', n: L('Cash') }].concat(e.cardOn ? [{ v: 'card', n: L('Credit card') }] : []), e.method, v => send('entry', 'method', v)));
+      const via = e.method === 'card' ? ((e.cards || []).length ? chipFlow(e.cards.map(n => ({ v: n, n })), e.card, v => send('entry', 'card', v)) : h('div', { class: 'w-rn', text: L('Add a credit card in Settings first') })) :
+        (e.method === 'account' && (e.accounts || []).length) ? chipFlow(e.accounts.map(n => ({ v: n, n })), e.account, v => send('entry', 'account', v)) : null;
+      if (via) card.appendChild(h('div', { class: 'w-eg' }, h('div', { class: 'w-label', text: L(e.mode === 'income' ? 'Received in' : 'Paid via') }), via));
+      card.appendChild(h('div', { class: 'w-eg' + (via ? '' : ' wide') },
         h('div', { class: 'w-label', text: e.catLabel }),
         chipFlow((e.cats || []).map(n => ({ v: n, n })), e.category, v => send('entry', 'category', v))));
     }
