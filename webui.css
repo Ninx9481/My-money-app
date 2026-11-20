@@ -484,3 +484,8 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
 .w-avatar .nm.editing { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .w-avatar .nm.editing .w-nameinp { width: min(190px, 46vw); margin: 0; }
 .w-avatar .nm.editing .w-nameok, .w-avatar .nm.editing .w-nameno { position: static; transform: none; left: auto; right: auto; }
+
+/* round chevron pinned top-right of the chip rows */
+.w-chips.hasmore { position: relative; padding-right: 50px; min-height: 38px; }
+.w-chips.hasmore > .w-chip.more { position: absolute; top: 0; right: 0; width: 38px; height: 38px; padding: 0; border-radius: 50%; }
+@media (min-width: 900px) { .w-chips.hasmore { padding-right: 52px; min-height: 40px; } .w-chips.hasmore > .w-chip.more { width: 40px; height: 40px; } }

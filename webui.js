@@ -18,7 +18,7 @@
     'Quick search records…': 'ค้นหารายการ…', 'Search': 'ค้นหา', 'Record a transaction': 'บันทึกรายการ', 'Recurring commitments': 'รายการประจำ', 'Ledger / people': 'บัญชีลูกหนี้ / เจ้าหนี้', 'History': 'ประวัติ', 'Preferences': 'การตั้งค่า', 'Overview': 'ภาพรวม',
     'Today': 'วันนี้', 'Entries': 'รายการ', 'Spent': 'จ่าย', 'Net': 'สุทธิ', 'This month': 'เดือนนี้', 'this month': 'เดือนนี้', 'No spending yet this month': 'เดือนนี้ยังไม่มีรายจ่าย', 'Latest entries': 'รายการล่าสุด', 'See all': 'ดูทั้งหมด',
     '30-day trend': 'แนวโน้ม 30 วัน', 'Inflow': 'เงินเข้า', 'Outflow': 'เงินออก', 'Where your money is': 'เงินอยู่ที่ไหนบ้าง', 'Annual projection': 'ประมาณการรายปี', 'Based on your current plans': 'จากรายการประจำที่มี', 'Due in 30 days': 'ครบกำหนดใน 30 วัน', 'Payments': 'รายการ', 'Total': 'รวม', 'By category': 'ตามหมวดหมู่', 'People': 'บุคคล', 'You owe': 'คุณเป็นหนี้', 'Owed to you': 'ค้างรับ', 'All settled': 'เคลียร์หมดแล้ว',
-    'New entry': 'เพิ่มรายการ', 'Recent': 'ล่าสุด', 'Add': 'เพิ่ม', 'Subs': 'ประจำ', 'Bills': 'บิล', 'Debts': 'หนี้', 'Summary': 'สรุป', 'Expense': 'รายจ่าย', 'Income': 'รายรับ', 'Travel': 'เดินทาง',
+    'New entry': 'เพิ่มรายการ', 'Recent': 'ล่าสุด', 'Add': 'เพิ่ม', 'Subs': 'ประจำ', 'Bills': 'บิล', 'Show more': 'แสดงเพิ่ม', 'Show less': 'แสดงน้อยลง', 'Debts': 'หนี้', 'Summary': 'สรุป', 'Expense': 'รายจ่าย', 'Income': 'รายรับ', 'Travel': 'เดินทาง',
     'Transfer': 'โอนเงิน', 'Account': 'บัญชี', 'Cash': 'เงินสด', 'Amount': 'จำนวนเงิน', 'From': 'จาก', 'To': 'ถึง', 'Swap': 'สลับ', 'Today': 'วันนี้',
     'Unlock': 'ปลดล็อก', 'OK': 'ตกลง', 'Cancel': 'ยกเลิก', 'Sync data': 'ซิงก์ข้อมูล', 'Recent entries': 'รายการล่าสุด', 'Settings': 'ตั้งค่า',
     'Or sign in with': 'หรือเข้าสู่ระบบด้วย', 'Or sign up with': 'หรือสมัครด้วย', 'Continue with Google': 'ดำเนินการต่อด้วย Google',
@@ -516,13 +516,18 @@
   }
   function chipFlow(items, sel, onpick, sels) {
     const el = h('div', { class: 'w-chips' });
+    const moreIt = items.find(it => it.v === '__more__' || it.v === '__less__');
     items.forEach(it => {
-      const more = it.v === '__more__' || it.v === '__less__';
-      const on = !more && (sels ? sels.indexOf(it.v) >= 0 : it.v === sel);
-      const b = h('button', { class: 'w-chip' + (on ? ' on' : '') + (more ? ' more' : ''), onclick: () => onpick(it.v) });
-      if (more) b.appendChild(svg(it.v === '__more__' ? 'down' : 'up', false, 16)); else b.textContent = it.n;
-      el.appendChild(b);
+      if (it === moreIt) return;
+      const on = sels ? sels.indexOf(it.v) >= 0 : it.v === sel;
+      el.appendChild(h('button', { class: 'w-chip' + (on ? ' on' : ''), text: it.n, onclick: () => onpick(it.v) }));
     });
+    if (moreIt) {   // round chevron pinned to the right of the first row; it flips in place instead of moving below
+      el.classList.add('hasmore');
+      const b = h('button', { class: 'w-chip more', 'aria-label': moreIt.v === '__more__' ? L('Show more') : L('Show less'), onclick: () => onpick(moreIt.v) });
+      b.appendChild(svg(moreIt.v === '__more__' ? 'down' : 'up', false, 16));
+      el.appendChild(b);
+    }
     return el;
   }
   function dueDismissed(set) {
