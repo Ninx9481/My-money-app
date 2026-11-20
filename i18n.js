@@ -262,6 +262,8 @@ const TH = {
 "Defaults loaded — go back to save": "โหลดค่าเริ่มต้นแล้ว — กดย้อนกลับเพื่อบันทึก",
 "Reset — go back to save": "รีเซ็ตแล้ว — กดย้อนกลับเพื่อบันทึก",
 "Settings saved": "บันทึกการตั้งค่าแล้ว",
+"Tap a name to change its name or emoji. Press and hold a row, then drag it to change the order. Emoji in your Google Sheet lists are kept and shown next to entries, never in the pickers.": "แตะชื่อเพื่อแก้ชื่อหรืออีโมจิ กดแถวค้างไว้แล้วลากขึ้นลงเพื่อเรียงลำดับ อีโมจิในรายการจาก Google Sheet ยังอยู่และแสดงข้าง ๆ รายการ แต่จะไม่แสดงในตัวเลือก",
+"Past entries are not changed.": "รายการที่บันทึกไปแล้วจะไม่ถูกเปลี่ยน",
 "Tap a name to change its name or emoji. Drag ≡ to change the order, tap − to remove. Emoji in your Google Sheet lists are kept and shown next to entries, never in the pickers.": "แตะชื่อเพื่อแก้ชื่อหรืออีโมจิ ลาก ≡ เพื่อเรียงลำดับ แตะ − เพื่อลบ อีโมจิในรายการจาก Google Sheet ยังอยู่และแสดงข้าง ๆ รายการ แต่จะไม่แสดงในตัวเลือก",
 "Edit item": "แก้ไขรายการ",
 "Emoji": "อีโมจิ",

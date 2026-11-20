@@ -674,17 +674,80 @@
       if (b.symbol) inner.push(h('button', { class: 'w-star' + (b.on ? ' on' : ''), 'aria-label': 'favorite', onclick: ev => { ev.stopPropagation(); send('screen', 'button', b.id); } }, svg(b.symbol === 'star.fill' || b.on ? 'star' : 'star', !!b.on, 20)));
       else inner.push(h('button', { class: 'w-pill', text: b.title || '', onclick: ev => { ev.stopPropagation(); send('screen', 'button', b.id); } }));
     }
-    if (ctx.edit && r.move != null) {
-      const i = ctx.i;
-      inner.push(h('span', { class: 'w-move' },
-        h('button', { disabled: i === 0, onclick: ev => { ev.stopPropagation(); send('screen', 'move', { key: r.move, from: i, to: i - 1 }); } }, svg('up', false, 16)),
-        h('button', { disabled: i >= ctx.lastMove, onclick: ev => { ev.stopPropagation(); send('screen', 'move', { key: r.move, from: i, to: i + 1 }); } }, svg('down', false, 16))));
-    }
+
     if (r.chevron) inner.push(h('span', { class: 'wchev' }, svg(r.chevron === 'up' ? 'up' : r.chevron === 'right' ? 'right' : 'down', false, 16)));
     inner.forEach(x => row.appendChild(x));
+    if (ctx.edit && r.move != null) dragRow(row, r, ctx);
     if (r.tap) row.addEventListener('click', () => send('screen', 'row', id));
     if (!ctx.edit && r.del) return swipeRow(row, r.del);
     return row;
+  }
+
+  /* press and hold a row, then drag it up or down to change the order */
+  function dragRow(row, r, ctx) {
+    row.dataset.mv = '1';
+    row.classList.add('w-dragrow');
+    let timer = 0, on = false, x0 = 0, y0 = 0, st0 = 0, pid = null, sibs = [], from = 0, to = 0, hgt = 0, y = 0, raf = 0, sawDrag = false;
+    const group = () => row.parentElement;
+    const clear = () => { clearTimeout(timer); timer = 0; };
+    const place = () => {
+      const dy = y - y0 + (main.scrollTop - st0);
+      row.style.transform = 'translateY(' + dy + 'px)';
+      const cur = sibs[from].mid + dy;
+      let t = from;
+      sibs.forEach((s, k) => { if (k < from && cur < s.mid) t = Math.min(t, k); if (k > from && cur > s.mid) t = Math.max(t, k); });
+      to = t;
+      sibs.forEach((s, k) => {
+        if (k === from) return;
+        const shift = (from < to && k > from && k <= to) ? -hgt : (from > to && k < from && k >= to) ? hgt : 0;
+        s.el.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+      });
+    };
+    const scrollLoop = () => {
+      if (!on) return;
+      const mr = main.getBoundingClientRect(), edge = 70;
+      let d = 0;
+      if (y < mr.top + edge) d = -Math.ceil((mr.top + edge - y) / 6); else if (y > mr.bottom - edge) d = Math.ceil((y - (mr.bottom - edge)) / 6);
+      if (d) { main.scrollTop += d; place(); }
+      raf = requestAnimationFrame(scrollLoop);
+    };
+    const start = () => {
+      const g = group(); if (!g) return;
+      sibs = Array.from(g.children).filter(e => e.dataset && e.dataset.mv).map(e => { const b = e.getBoundingClientRect(); return { el: e, mid: b.top + b.height / 2 }; });
+      from = sibs.findIndex(s => s.el === row); if (from < 0) return;
+      to = from; hgt = row.getBoundingClientRect().height; st0 = main.scrollTop;
+      on = true; sawDrag = true; row.classList.add('lifting'); g.classList.add('dragging');
+      try { row.setPointerCapture(pid); } catch (e) { /* ignore */ }
+      if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) { /* ignore */ } }
+      raf = requestAnimationFrame(scrollLoop);
+    };
+    const finish = (commit) => {
+      clear(); cancelAnimationFrame(raf);
+      if (!on) return;
+      on = false;
+      const g = group();
+      row.classList.remove('lifting'); if (g) g.classList.remove('dragging');
+      sibs.forEach(s => { s.el.style.transform = ''; });
+      row.style.transform = '';
+      // the list is redrawn from the model: send the move (indexes inside the draft list)
+      const base = ctx.i - from;
+      if (commit && to !== from) send('screen', 'move', { key: r.move, from: base + from, to: base + to });
+      setTimeout(() => { sawDrag = false; }, 0);
+    };
+    row.addEventListener('pointerdown', e => {
+      if (e.button > 0 || e.target.closest('.w-star, input, textarea')) return;
+      x0 = e.clientX; y0 = y = e.clientY; pid = e.pointerId; clear();
+      timer = setTimeout(start, 280);
+    });
+    row.addEventListener('pointermove', e => {
+      if (on) { y = e.clientY; place(); return; }
+      if (timer && (Math.abs(e.clientX - x0) > 9 || Math.abs(e.clientY - y0) > 9)) clear();   // a scroll or a swipe, not a long press
+    });
+    row.addEventListener('pointerup', () => { clear(); finish(true); });
+    row.addEventListener('pointercancel', () => { clear(); finish(false); });
+    row.addEventListener('touchmove', e => { if (on) e.preventDefault(); }, { passive: false });
+    row.addEventListener('contextmenu', e => { if (timer || on) e.preventDefault(); });
+    row.addEventListener('click', e => { if (sawDrag) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
   }
 
   /* swipe a row left to reveal Delete (touch or mouse drag) */
@@ -712,7 +775,7 @@
     const id = r.id || '';
     const kb = r.kbd || 'text';
     const inp = h('input', {
-      class: 'w-field' + (r.big ? ' wbig' : ''), 'data-rid': id, placeholder: r.placeholder || '', autocomplete: 'off', autocapitalize: kb === 'text' ? 'sentences' : 'none',
+      class: 'w-field' + (r.big ? ' wbig' : '') + (r.left ? ' left' : ''), 'data-rid': id, placeholder: r.placeholder || '', autocomplete: 'off', autocapitalize: kb === 'text' ? 'sentences' : 'none',
       type: kb === 'secure' ? 'password' : kb === 'url' ? 'url' : kb === 'email' ? 'email' : 'text',
       inputmode: kb === 'decimal' ? 'decimal' : kb === 'number' ? 'numeric' : null
     });

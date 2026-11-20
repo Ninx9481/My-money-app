@@ -421,11 +421,18 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
 .w-list > .w-sec:has(.w-totals) .w-group, .w-group.bare { background: transparent !important; box-shadow: none !important; overflow: visible; border-radius: 0; }
 
 /* ---- list editor (categories, accounts…): slimmer rows; the up / down arrows sit side by side ---- */
-.w-row:has(.w-minus) { padding-top: 6px; padding-bottom: 6px; min-height: 46px; gap: 10px; }
-.w-sec .w-row:has(.w-minus) { padding-top: 6px; padding-bottom: 6px; min-height: 48px; }
-.w-row:has(.w-minus) .ic { font-size: 19px; width: 28px; height: 28px; border-radius: 8px; background: transparent; }
-.w-row:has(.w-minus) .ti { font-size: 15.5px; }
-.w-row:has(.w-minus) .w-move { flex-direction: row; }
-.w-row:has(.w-minus) .w-move button { padding: 6px 7px; }
-.w-row:has(.w-minus) .w-star { margin: 0 -2px; padding: 6px; }
-.w-row:has(.w-minus) .w-minus { width: 22px; height: 22px; }
+.w-row.w-dragrow { padding-top: 6px; padding-bottom: 6px; min-height: 46px; gap: 10px; }
+.w-sec .w-row.w-dragrow { padding-top: 6px; padding-bottom: 6px; min-height: 48px; }
+.w-row.w-dragrow .ic { font-size: 19px; width: 28px; height: 28px; border-radius: 8px; background: transparent; }
+.w-row.w-dragrow .ti { font-size: 15.5px; }
+.w-row.w-dragrow .w-move { flex-direction: row; }
+.w-row.w-dragrow .w-move button { padding: 6px 7px; }
+.w-row.w-dragrow .w-star { margin: 0 -2px; padding: 6px; }
+
+/* list editor: press and hold, then drag */
+.w-dragrow { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.w-group.dragging .w-row { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.w-group.dragging .w-row.lifting { transition: none; position: relative; z-index: 5; background: var(--card); box-shadow: 0 8px 24px rgba(0,0,0,.18), 0 0 0 1px var(--line); border-radius: 12px; }
+.w-group.dragging { overflow: visible; }
+.w-field.left, .w-row.field .w-field.left { text-align: left; }
+.w-row.w-dragrow .w-move { display: none; }

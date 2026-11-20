@@ -728,10 +728,11 @@ function openListEdit(sub, i) {
 }
 function listForm() {
   const secs = [
+    { header: { title: 'Name' }, footer: lf.orig !== lf.name.trim() ? 'Past entries keep the old name. Stars, budgets and tax settings follow the new one.' : '', rows: [{ type: 'field', id: 'lname', left: true, kbd: 'text', value: lf.name, placeholder: 'Name' }] },
     { header: { title: 'Emoji' }, footer: 'Pick one or type your own. Leave it empty for none.', rows: [
-      { type: 'field', id: 'lemoji', kbd: 'text', value: lf.icon, placeholder: '🙂' },
+      { type: 'field', id: 'lemoji', left: true, kbd: 'text', value: lf.icon, placeholder: '🙂' },
       { type: 'chips', id: 'lemo', sel: lf.icon, items: EMOJI_PICKS.map(e => ({ v: e, n: e })) }] },
-    { header: { title: 'Name' }, footer: lf.orig !== lf.name.trim() ? 'Past entries keep the old name. Stars, budgets and tax settings follow the new one.' : '', rows: [{ type: 'field', id: 'lname', kbd: 'text', value: lf.name, placeholder: 'Name' }] }
+    { rows: [{ type: 'button', id: 'ldel', title: 'Delete this item', style: 'danger' }] }
   ];
   return { page: 'form-list-' + formSession, colors: formColors('trv'), nonce: screenNonce, sections: secs };
 }
@@ -743,6 +744,14 @@ function lfAction(kind, v) {
     if (o.id === 'lname') lf.name = String(o.v);
     else if (o.id === 'lemoji') { lf.icon = firstGlyph(o.v); }
   } else if (kind === 'chip') { if (o.id === 'lemo') { lf.icon = lf.icon === o.v ? '' : String(o.v); formSession++; } }
+  else if (kind === 'button') { if (v === 'ldel') deleteListItem(); }
+}
+async function deleteListItem() {
+  const f = lf; if (!f) return;
+  const r = await askAlert('Delete this item?', 'Past entries are not changed.', [{ id: 'del', title: 'Delete', style: 'destructive' }, { id: 'no', title: 'Cancel', style: 'cancel' }]);
+  if (r !== 'del' || lf !== f) return;
+  if (draft[f.sub]) draft[f.sub].splice(f.i, 1);
+  lf = null; render(); toast('Deleted');
 }
 function saveListEdit() {
   if (!lfComplete()) { if (lf && lfNameTaken()) toast('Already in the list'); lf = null; pushChrome(); return; }
@@ -2141,12 +2150,13 @@ function settingsModel(colors) {
   // a list: drag the handles to reorder, tap − to remove
   const starable = sub === 'accounts' || sub === 'expense' || sub === 'income' || sub === 'travel';
   const rows = (draft[sub] || []).map((raw, i) => {
-    const r = { type: 'row', id: 'ed:' + sub + ':' + i, tap: true, icon: parseItem(raw).icon, title: parseItem(raw).name, del: 'li:' + sub + ':' + i, move: sub };
+    const r = IOS ? { type: 'row', icon: parseItem(raw).icon, title: parseItem(raw).name, del: 'li:' + sub + ':' + i, move: sub }
+                  : { type: 'row', id: 'ed:' + sub + ':' + i, tap: true, icon: parseItem(raw).icon, title: parseItem(raw).name, move: sub };
     if (starable) r.button = { id: 'fav:' + sub + ':' + i, symbol: favOf(sub).includes(parseItem(raw).name) ? 'star.fill' : 'star', on: favOf(sub).includes(parseItem(raw).name) };
     return r;
   });
   rows.push({ type: 'field', id: 'add:' + sub, commit: true, kbd: 'text', placeholder: 'Add new…', value: '' });
-  secs.push({ footer: (starable ? 'Tap ★ to pin favorites: the Add page shows only starred ones, with a chevron to reveal the rest. ' : '') + 'Tap a name to change its name or emoji. Drag ≡ to change the order, tap − to remove. Emoji in your Google Sheet lists are kept and shown next to entries, never in the pickers.', rows });
+  secs.push({ footer: (starable ? 'Tap ★ to pin favorites: the Add page shows only starred ones, with a chevron to reveal the rest. ' : '') + (IOS ? 'Drag ≡ to change the order, tap − to remove. ' : 'Tap a name to change its name or emoji. Press and hold a row, then drag it to change the order. ') + 'Emoji in your Google Sheet lists are kept and shown next to entries, never in the pickers.', rows });
   secs.push({ rows: [{ type: 'button', id: 'reset', title: 'Reset to defaults', style: 'danger' }] });
   return Object.assign({ page: 'settings:' + sub, sections: secs, edit: true }, base);
 }
