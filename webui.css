@@ -500,3 +500,14 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
   .w-eg.wide { grid-column: 1 / -1; }
 }
 @media (min-width: 900px) { .w-card.wentry > .w-save { justify-self: center; } }
+
+/* sliding highlight: segmented controls + tab bar */
+.w-seg.js { position: relative; }
+.w-seg.js > button { position: relative; z-index: 1; }
+.w-seg.js > button.on, .w-card.wentry > .w-seg.js button.on { background: transparent !important; box-shadow: none !important; }
+.w-seg-ind { position: absolute; top: 3px; bottom: 3px; left: 0; width: 0; opacity: 0; border-radius: 9px; background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.12); transition: left .3s cubic-bezier(.4,.1,.2,1), width .3s cubic-bezier(.4,.1,.2,1), opacity .15s; pointer-events: none; }
+.w-tab-ind { position: absolute; top: 0; left: 0; width: 0; height: 0; opacity: 0; border-radius: 28px; background: color-mix(in srgb, var(--trv) 14%, var(--card)); pointer-events: none; transition: transform .32s cubic-bezier(.4,.1,.2,1), width .32s, height .32s, opacity .15s; }
+.w-tabs > .w-tab { z-index: 1; }
+.w-tab.on, .w-tab.on:hover { background: transparent !important; }
+@media (min-width: 900px) { .w-tabs, .w-tabs.off { position: relative; } .w-tab-ind { border-radius: 12px; background: var(--chip); } }
+@media (prefers-reduced-motion: reduce) { .w-seg-ind, .w-tab-ind { transition: none !important; } }

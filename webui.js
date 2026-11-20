@@ -114,6 +114,21 @@
     b.append(svg(icon, false, 24), h('span', { class: 'tl' }), h('i', { class: 'wdot', hidden: true }));
     tabBtns[page] = b; tabBar.appendChild(b);
   });
+  const tabInd = h('span', { class: 'w-tab-ind' });
+  tabBar.appendChild(tabInd);
+  let tabFirst = true;
+  const moveTabInd = () => {
+    const b = tabBar.querySelector('.w-tab.on'), r = tabBar.getBoundingClientRect();
+    if (!b || !r.width || !b.offsetWidth) { tabInd.style.opacity = 0; return; }
+    const q = b.getBoundingClientRect();
+    if (!q.width) { tabInd.style.opacity = 0; return; }
+    if (tabFirst) tabInd.style.transition = 'none';
+    tabInd.style.opacity = 1;
+    tabInd.style.width = q.width + 'px'; tabInd.style.height = q.height + 'px';
+    tabInd.style.transform = 'translate(' + (q.left - r.left - tabBar.clientLeft) + 'px,' + (q.top - r.top - tabBar.clientTop) + 'px)';
+    if (tabFirst) { void tabInd.offsetWidth; tabInd.style.transition = ''; tabFirst = false; }
+  };
+  addEventListener('resize', () => { tabFirst = true; moveTabInd(); });
   const sideAv = h('span', { class: 'w-av-mini' });
   const sideSet = h('button', { class: 'w-side-set', onclick: () => act('profile') }, sideAv, h('span', { class: 'sl' }));
   const menuEl = h('div', { class: 'w-menu-wrap', hidden: true });
@@ -265,6 +280,7 @@
       b.querySelector('.tl').textContent = L(label);
       b.querySelector('.wdot').hidden = !(page === 'subs' && m.due);
     });
+    requestAnimationFrame(moveTabInd);
 
     sideSet.querySelector('.sl').textContent = L('Profile');
     sideSet.classList.toggle('on', m.page === 'profile' || String(m.page || '').indexOf('settings') === 0);
@@ -507,11 +523,30 @@
   /* ---------- Add page ---------- */
   const entryEl = { amount: null };
   let entryClear = 0, entryFocus = 0;
+  const segPos = {};
   function seg(items, sel, onpick, cls) {
-    const el = h('div', { class: 'w-seg ' + (cls || '') });
+    const el = h('div', { class: 'w-seg js ' + (cls || '') });
+    const ind = h('span', { class: 'w-seg-ind' });
+    el.appendChild(ind);
     items.forEach(it => {
       el.appendChild(h('button', { class: it.v === sel ? 'on' : '', text: it.n, onclick: () => onpick(it.v) }));
     });
+    const key = (cls || '') + '|' + items.map(it => it.v).join(',');
+    const place = tries => {
+      const b = el.querySelector('button.on');
+      if (!b || !el.isConnected || !b.offsetWidth) { if (tries < 8) requestAnimationFrame(() => place(tries + 1)); return; }
+      const to = { l: b.offsetLeft, w: b.offsetWidth }, from = segPos[key];
+      segPos[key] = to;
+      ind.style.opacity = 1;
+      if (from && (from.l !== to.l || from.w !== to.w)) {
+        ind.style.transition = 'none'; ind.style.left = from.l + 'px'; ind.style.width = from.w + 'px';
+        void ind.offsetWidth;
+        ind.style.transition = '';
+      } else ind.style.transition = 'none';
+      ind.style.left = to.l + 'px'; ind.style.width = to.w + 'px';
+      if (!ind.style.transition) void 0; else { void ind.offsetWidth; ind.style.transition = ''; }
+    };
+    requestAnimationFrame(() => place(0));
     return el;
   }
   function chipFlow(items, sel, onpick, sels) {
