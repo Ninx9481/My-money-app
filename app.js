@@ -124,7 +124,8 @@ let inflight = null;
 const ui = {
   page: 'entry',
   mode: 'expense',            // expense | income | travel
-  method: 'account',          // account | cash
+  method: 'account',          // account | cash | card
+  card: '',
   account: LS.get('lastAccount', ''),
   category: '',
   date: todayStr(),
@@ -208,7 +209,7 @@ function itemInfo(t, mp) {
 
 function itemHTML(t, mp, showDate) {
   const info = itemInfo(t, mp);
-  const end = (cash, name) => cash ? 'Cash' : (tn(name) || 'Account');
+  const end = (cash, name) => cash ? 'Cash' : (tn(acctLabel(name)) || 'Account');
   const way = t.type === 'transfer' ? end(t.method === 'cash', t.account) + ' → ' + end(t.sub === TO_CASH, t.sub) : end(t.method === 'cash', t.account);
   const sub = [showDate ? dateLabel(t.date) : '', way, t.note].filter(Boolean).map(esc).join(' · ');
   const sign = t.type === 'transfer' ? '' : t.type === 'income' ? '+' : '−';
@@ -225,6 +226,36 @@ const sortTx = arr => arr.slice().sort((a, b) => (b.date.localeCompare(a.date)) 
 /* ================= entry page ================= */
 function listFor(mode) { return mode === 'income' ? settings.income : mode === 'travel' ? settings.travel : settings.expense; }
 const accountNames = () => settings.accounts.map(a => parseItem(a).name);
+/* credit cards: a card is stored on an entry as account "card:<name>" (method stays "account", so every sheet/backend keeps it) */
+const CARD_PFX = 'card:';
+const isCardAcct = a => String(a || '').startsWith(CARD_PFX);
+const acctLabel = a => isCardAcct(a) ? String(a).slice(CARD_PFX.length) : a;
+const cardsList = () => Array.isArray(settings.cards) ? settings.cards : [];
+const cardNames = () => cardsList().map(c => c.name);
+const cardKey = c => CARD_PFX + c.name;
+function cardUsed(c) {
+  const k = cardKey(c); let u = Number(c.open) || 0;
+  tx.forEach(t => {
+    if (t.type === 'transfer') { if (t.sub === k) u -= t.amount; }
+    else if (t.account === k) { if (t.type === 'income') u -= t.amount; else u += t.amount; }
+  });
+  return Math.round(u * 100) / 100;
+}
+function cardStatus(c) {
+  const today = todayDate(), dc = Number(c.cutoff) || 0, dd = Number(c.due) || 0;
+  const clamp = (y, m, d) => new Date(y, m, Math.min(d, new Date(y, m + 1, 0).getDate()));
+  let lastCut = null, due = null;
+  if (dc) { let cut = clamp(today.getFullYear(), today.getMonth(), dc); if (cut > today) cut = clamp(today.getFullYear(), today.getMonth() - 1, dc); lastCut = cut; }
+  if (dd) {
+    const base = lastCut || new Date(today.getFullYear(), today.getMonth(), 0);
+    due = clamp(base.getFullYear(), base.getMonth(), dd);
+    if (due <= base || (!lastCut && due < today)) due = clamp(base.getFullYear(), base.getMonth() + 1, dd);
+  }
+  const used = cardUsed(c), limit = Number(c.limit) || 0, k = cardKey(c), cs = lastCut ? ymd(lastCut) : '';
+  const fresh = lastCut ? tx.filter(t => t.type !== 'transfer' && t.type !== 'income' && t.account === k && t.date > cs).reduce((a, t) => a + t.amount, 0) : 0;
+  const billed = Math.max(0, Math.round((used - fresh) * 100) / 100);
+  return { used, limit, avail: Math.round((limit - used) * 100) / 100, fresh: Math.round(fresh * 100) / 100, billed, lastCut, due, dueIn: due ? Math.round((due - today) / 86400000) : null };
+}
 // Starred items (Settings › list › ★) are the only chips the Add page shows until the chevron is tapped.
 const favOf = key => ((settings.fav && settings.fav[key]) || []);
 function favChips(names, key, selected, open) {
@@ -274,10 +305,11 @@ function renderEntry() {
   if (isTr) {
     const ends = [{ v: CASH_KEY, n: 'Cash' }].concat(accountNames().map(n => ({ v: n, n })));
     if (!ends.some(e => e.v === ui.from)) ui.from = ends.length > 1 ? ends[1].v : CASH_KEY;
-    if (!ends.some(e => e.v === ui.to) || ui.to === ui.from) ui.to = (ends.find(e => e.v !== ui.from) || {}).v || '';
+    const toEnds = ends.concat(cardNames().map(n => ({ v: CARD_PFX + n, n })));
+    if (!toEnds.some(e => e.v === ui.to) || ui.to === ui.from) ui.to = (toEnds.find(e => e.v !== ui.from) || {}).v || '';
     const row = (cur, attr) => ends.map(e => `<button type="button" class="chip${e.v === cur ? ' on' : ''}" data-${attr}="${esc(e.v)}">${esc(e.n)}</button>`).join('');
     $('#fromRow').innerHTML = row(ui.from, 'from');
-    $('#toRow').innerHTML = row(ui.to, 'to');
+    $('#toRow').innerHTML = toEnds.map(e => `<button type="button" class="chip${e.v === ui.to ? ' on' : ''}" data-to="${esc(e.v)}">${esc(e.n)}</button>`).join('');
   }
   $('#catLabel').textContent = ui.mode === 'travel' ? 'Travel type' : 'Category';
   $('#catChips').innerHTML = listFor(ui.mode).map((c, i) => {
@@ -300,6 +332,7 @@ function addEntry() {
   const amt = parseAmount($('#amount').value);
   if (!(amt > 0)) { toast('Enter an amount first'); if (NATIVE) { entryFocus++; pushChrome(); } else $('#amount').focus(); return; }
   const travel = ui.mode === 'travel';
+  if (ui.mode !== 'transfer' && effMethod() === 'card' && !ui.card) { toast('Add a credit card in Settings first'); return; }
   if (ui.mode === 'transfer') {
     if (!ui.from || !ui.to || ui.from === ui.to) { toast('Pick two different accounts'); return; }
     const fc = ui.from === CASH_KEY;
@@ -310,8 +343,8 @@ function addEntry() {
     date: ui.date || todayStr(),
     type: ui.mode === 'income' ? 'income' : ui.mode === 'transfer' ? 'transfer' : 'expense',
     amount: amt,
-    method: ui.method,
-    account: ui.method === 'account' ? ui.account : '',
+    method: effMethod() === 'cash' ? 'cash' : 'account',
+    account: effMethod() === 'account' ? ui.account : effMethod() === 'card' ? CARD_PFX + ui.card : '',
     category: travel ? TRAVEL : (ui.category || NONE),
     sub: travel ? ui.category : '',
     note: $('#note').value.trim(),
@@ -328,7 +361,7 @@ function addEntry() {
   sizeAmount();
   $('#note').value = '';
   $('#amount').blur(); $('#note').blur();
-  entryClear++;
+  entryClear++; entryFill = '';
   ui.category = '';
   ui.date = todayStr();
   renderEntry();
@@ -370,7 +403,7 @@ async function removeTx(id) {
 /* ================= recent page ================= */
 function searchText(t, mp) {
   const info = itemInfo(t, mp);
-  return [info.title, t.type, t.note, tn(t.category), tn(t.sub === TO_CASH ? 'Cash' : t.sub), t.method === 'cash' ? 'cash' : tn(t.account), String(t.amount), money(t.amount)]
+  return [info.title, t.type, t.note, tn(t.category), tn(t.sub === TO_CASH ? 'Cash' : acctLabel(t.sub)), t.method === 'cash' ? 'cash' : tn(acctLabel(t.account)), String(t.amount), money(t.amount)]
     .filter(Boolean).join(' ').toLowerCase();
 }
 function renderRecent() {
@@ -416,10 +449,11 @@ function balances() {
   tx.forEach(t => {
     const side = (cash, name) => cash ? row(CASH_KEY, 'Cash', true) : row(tn(name) || 'Account', tn(name) || 'Account', false);
     if (t.type === 'transfer') {
-      side(t.method === 'cash', t.account).exp += t.amount;        // money leaves the source
-      side(t.sub === TO_CASH, t.sub).inc += t.amount;               // and arrives at the destination
+      if (!isCardAcct(t.account)) side(t.method === 'cash', t.account).exp += t.amount;        // money leaves the source
+      if (!isCardAcct(t.sub)) side(t.sub === TO_CASH, t.sub).inc += t.amount;                  // and arrives at the destination (a card payment only lowers the card's balance)
       return;
     }
+    if (isCardAcct(t.account)) return;                                                          // spending on a card does not move any account until the card is paid
     const r = side(t.method === 'cash', t.account);
     if (t.type === 'income') r.inc += t.amount; else r.exp += t.amount;
   });
@@ -958,7 +992,7 @@ function renderSummary() {
   const travel = exp.filter(t => t.travel);
   $('#travelCard').hidden = !travel.length;
   if (has) {
-    $('#splitList').innerHTML = compHTML(groupSum(exp, t => t.method === 'cash' ? 'Cash' : (tn(t.account) || 'Account')), expSum);
+    $('#splitList').innerHTML = compHTML(groupSum(exp, t => t.method === 'cash' ? 'Cash' : (tn(acctLabel(t.account)) || 'Account')), expSum);
     $('#catList').innerHTML = compHTML(groupSum(exp, t => t.travel ? TRAVEL : (tn(t.category) || NONE)), expSum);
   }
   if (travel.length) {
@@ -1504,8 +1538,11 @@ function renderSubs() {
   }).join('') : '<div class="empty">Nothing here yet</div>';
 }
 
+function cardDueItems() {
+  return cardsList().map(c => ({ c, st: cardStatus(c) })).filter(k => k.st.billed > 0 && k.st.due && k.st.dueIn <= 3).map(k => ({ name: k.c.name + ' card', next: ymd(k.st.due) }));
+}
 function renderDue() {
-  const due = dueSubs();
+  const due = dueSubs().concat(cardDueItems());
   const b = $('#dueBanner');
   b.hidden = !due.length || ui.page !== 'entry';
   $('#subsDot').hidden = !due.length;
@@ -1553,6 +1590,75 @@ function payNow(id, amtOv, dateOv) {
   sync();
 }
 
+/* ---------- credit cards ---------- */
+function saveCards(arr) {
+  settings = Object.assign({}, settings, { cards: arr });
+  saveSettingsLocal();
+  queue = queue.filter(o => o.op !== 'saveSettings');
+  queue.push({ op: 'saveSettings', settings });
+  saveQueue();
+}
+let cf = null;
+function openCardForm(id) {
+  const c = id ? cardsList().find(x => x.id === id) : null;
+  cf = c ? { id, name: c.name, limit: String(c.limit || ''), cutoff: c.cutoff ? String(c.cutoff) : '', due: c.due ? String(c.due) : '', open: c.open ? String(c.open) : '' }
+         : { id: '', name: '', limit: '', cutoff: '', due: '', open: '' };
+  formSession++; pushChrome();
+}
+function cardForm() {
+  const secs = [
+    { header: { title: 'Card name' }, footer: cf.id ? 'The name can’t be changed after the card is created.' : '',
+      rows: cf.id ? [{ type: 'row', title: cf.name }] : [{ type: 'field', id: 'cname', left: true, kbd: 'text', value: cf.name, placeholder: 'e.g. KTC Visa' }] },
+    { header: { title: 'Credit limit' }, rows: [{ type: 'field', id: 'climit', big: true, kbd: 'decimal', value: cf.limit, placeholder: '0.00' }] },
+    { header: { title: 'Statement cut-off day' }, footer: 'The day of the month your statement closes (1–31). Optional.', rows: [{ type: 'field', id: 'ccut', kbd: 'number', value: cf.cutoff, placeholder: 'e.g. 25' }] },
+    { header: { title: 'Payment due day' }, footer: 'The day of the month you must pay by (1–31). Optional. You get a reminder before it.', rows: [{ type: 'field', id: 'cdue', kbd: 'number', value: cf.due, placeholder: 'e.g. 10' }] },
+    { header: { title: 'Used so far' }, footer: 'What you already owe on this card before your first entry here. Optional.', rows: [{ type: 'field', id: 'copen', kbd: 'decimal', value: cf.open, placeholder: '0.00' }] }
+  ];
+  if (cf.id) secs.push({ rows: [{ type: 'button', id: 'cdel', title: 'Delete this card', style: 'danger' }] });
+  return { page: 'form-card-' + formSession, colors: formColors('trv'), nonce: screenNonce, sections: secs };
+}
+const cfDay = v => { const n = parseInt(v, 10); return n >= 1 && n <= 31 ? n : 0; };
+const cfNameTaken = () => cardsList().some(c => c.id !== cf.id && c.name.toLowerCase() === cf.name.trim().toLowerCase());
+const cfComplete = () => !!cf && cf.name.trim().length > 0 && parseAmount(cf.limit) > 0 && !cfNameTaken();
+function cfAction(kind, v) {
+  const o = (v && typeof v === 'object') ? v : {};
+  if (kind === 'field') {
+    if (o.id === 'cname') cf.name = String(o.v); else if (o.id === 'climit') cf.limit = numOnly(String(o.v));
+    else if (o.id === 'ccut') cf.cutoff = String(o.v).replace(/\D/g, '').slice(0, 2); else if (o.id === 'cdue') cf.due = String(o.v).replace(/\D/g, '').slice(0, 2);
+    else if (o.id === 'copen') cf.open = numOnly(String(o.v));
+  } else if (kind === 'button') { if (v === 'cdel') deleteCard(); }
+}
+async function deleteCard() {
+  const f = cf; if (!f || !f.id) return;
+  const r = await askAlert('Delete this card?', 'Past entries on it are kept.', [{ id: 'del', title: 'Delete', style: 'destructive' }, { id: 'no', title: 'Cancel', style: 'cancel' }]);
+  if (r !== 'del' || cf !== f) return;
+  saveCards(cardsList().filter(c => c.id !== f.id)); cf = null; render(); toast('Deleted'); sync();
+}
+function cardSheetAction() {
+  if (!cfComplete()) { if (cf && cf.name.trim() && cfNameTaken()) toast('Already in the list'); cf = null; pushChrome(); return; }
+  const c = { id: cf.id || uid(), name: cf.name.trim(), limit: parseAmount(cf.limit), cutoff: cfDay(cf.cutoff), due: cfDay(cf.due), open: parseAmount(cf.open) };
+  saveCards(cf.id ? cardsList().map(x => x.id === c.id ? c : x) : cardsList().concat([c]));
+  cf = null; render(); toast('Saved'); sync();
+}
+async function showCardDetail(id) {
+  const c = cardsList().find(x => x.id === id); if (!c) return;
+  const st = cardStatus(c), lines = [];
+  lines.push('Used  ' + baht(st.used), 'Limit  ' + baht(st.limit), 'Available  ' + baht(st.avail));
+  if (st.lastCut) lines.push('Statement balance  ' + baht(st.billed), 'New since ' + F_DM.format(st.lastCut) + '  ' + baht(st.fresh));
+  if (st.due) lines.push('Payment due  ' + F_FULL.format(st.due) + ' (' + dueText(st.dueIn, ymd(st.due)).toLowerCase() + ')');
+  const r = await askAlert(c.name, lines.join('\n'), [{ id: 'pay', title: 'Pay this card', style: 'default' }, { id: 'edit', title: 'Edit', style: 'default' }, { id: 'close', title: 'Close', style: 'cancel' }]);
+  if (r === 'edit') openCardForm(id); else if (r === 'pay') payCard(id);
+}
+function payCard(id) {
+  const c = cardsList().find(x => x.id === id); if (!c) return;
+  const st = cardStatus(c);
+  ui.mode = 'transfer'; ui.to = cardKey(c); ui.from = accountNames()[0] || CASH_KEY; if (ui.from === ui.to) ui.from = '';
+  ui.category = ''; entryClear++;
+  const amt = st.billed > 0 ? st.billed : Math.max(st.used, 0);
+  entryFill = amt > 0 ? String(amt) : ''; $('#amount').value = entryFill; sizeAmount();
+  showPage('entry'); renderEntry();
+}
+
 /* pay a bill: the real amount differs every month */
 let pf = null;
 function openPayBill(id) {
@@ -1598,14 +1704,14 @@ function renderSubEditor() {
   if (sb.cat && !cats.includes(sb.cat)) cats.push(sb.cat);
   const rem = [[-1, 'No reminder'], [0, 'On the day'], [1, '1 day before'], [3, '3 days before'], [7, '7 days before']];
   const card = sb.kind === 'card';
-  $('#subTitle').textContent = (sb.id ? 'Edit ' : 'New ') + (card ? 'credit card plan' : sb.kind === 'bill' ? 'bill' : 'subscription');
+  $('#subTitle').textContent = (sb.id ? 'Edit ' : 'New ') + (card ? 'installment plan' : sb.kind === 'bill' ? 'bill' : 'subscription');
   const planHtml = `<div class="fld">Installments left</div>
     <input id="sbN" class="edit-in" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 6" value="${sb.plan.length}">
     <div class="fld">Amount of each installment</div>
     <div class="plan-fill"><input id="sbFill" class="edit-in" type="text" inputmode="decimal" autocomplete="off" placeholder="Same amount for all"><button type="button" class="ghost" id="sbFillBtn">Fill all</button></div>
     <div class="plan">` + sb.plan.map((v, i) => `<div class="plan-row"><span>${i + 1}</span><input class="edit-in" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" data-plan="${i}" value="${esc(v)}" aria-label="Installment ${i + 1}"></div>`).join('') + `</div>`;
   $('#subBody').innerHTML = `
-    <div class="fld">Type</div>${chipRow([{ v: 'bill', n: 'Bill' }, { v: 'sub', n: 'Subscription' }, { v: 'card', n: 'Credit card' }], sb.kind, 'skind')}
+    <div class="fld">Type</div>${chipRow([{ v: 'bill', n: 'Bill' }, { v: 'sub', n: 'Subscription' }, { v: 'card', n: 'Installment' }], sb.kind, 'skind')}
     <div class="fld">Name</div><input id="sbName" class="edit-in" type="text" autocomplete="off" placeholder="${card ? 'e.g. iPhone installment' : 'e.g. Netflix'}" value="${esc(sb.name)}">
     ${card ? planHtml : `<div class="fld">Amount</div><input id="sbAmt" class="edit-in big" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(sb.amount)}">
     <div class="fld">Billing cycle</div>${chipRow([{ v: 'month', n: 'Monthly' }, { v: 'year', n: 'Yearly' }], sb.cycle, 'scycle')}`}
@@ -1633,7 +1739,7 @@ function updateSubAction() {
 }
 async function subAction() {
   if (!sb) return;
-  const noun = sb.kind === 'card' ? 'credit card plan' : sb.kind === 'bill' ? 'bill' : 'subscription';
+  const noun = sb.kind === 'card' ? 'installment plan' : sb.kind === 'bill' ? 'bill' : 'subscription';
   if (subComplete()) {
     const r = await askAlert(sb.id ? 'Save changes?' : 'Add this ' + noun + '?', sb.name.trim(),
       [{ id: 'ok', title: sb.id ? 'Save' : 'Add', style: 'default' }, { id: 'discard', title: 'Discard', style: 'destructive' }, { id: 'keep', title: 'Keep editing', style: 'cancel' }]);
@@ -1663,7 +1769,7 @@ function saveSub() {
   closeSub(); render(); toast(sb0kind === 'bill' ? 'Bill saved' : 'Saved'); sync();
 }
 async function deleteSub() {
-  const r = await askAlert('Delete this ' + (sb.kind === 'card' ? 'credit card plan' : sb.kind === 'bill' ? 'bill' : 'subscription') + '?', sb.name, [{ id: 'del', title: 'Delete', style: 'destructive' }, { id: 'no', title: 'Cancel', style: 'cancel' }]);
+  const r = await askAlert('Delete this ' + (sb.kind === 'card' ? 'installment plan' : sb.kind === 'bill' ? 'bill' : 'subscription') + '?', sb.name, [{ id: 'del', title: 'Delete', style: 'destructive' }, { id: 'no', title: 'Cancel', style: 'cancel' }]);
   if (r !== 'del' || !sb) return;
   const id = sb.id;
   saveSubs(subsList().filter(q => q.id !== id));
@@ -1768,6 +1874,7 @@ async function editAction() {
 }
 function sheetAction() {
   if (lf) { listSheetAction(); return; }
+  if (cf) { cardSheetAction(); return; }
   if (pf) { paySheetAction(); return; }
   if (gf) { goalSheetAction(); return; }
   if (ie || df) { debtSheetAction(); return; }
@@ -1863,6 +1970,7 @@ function saveSettingsForm() {
 /* ---------- native bars bridge (iPhone app only) ---------- */
 function sheetInfo() {
   if (lf) return { title: 'Edit item', action: lfComplete() ? 'confirm' : 'close' };
+  if (cf) return { title: cf.id ? 'Edit card' : 'New card', action: cfComplete() ? 'confirm' : 'close' };
   if (pf) return { title: 'Pay ' + pf.name, action: pfComplete() ? 'confirm' : 'close' };
   if (gf) return { title: gf.id ? 'Edit goal' : 'New goal', action: gfComplete() ? 'confirm' : 'close' };
   if (ie) return { title: 'Edit item', action: ieComplete() ? 'confirm' : 'close' };
@@ -1944,7 +2052,7 @@ function pushChrome() {
 }
 
 /* ---------- native Add page: state out, actions in ---------- */
-let entryClear = 0, entryFocus = 0, colorCache = { key: '', v: null };
+let entryFill = '', entryClear = 0, entryFocus = 0, colorCache = { key: '', v: null };
 function rgbOf(cssVar) {
   const d = document.createElement('div');
   d.style.cssText = 'position:absolute;visibility:hidden;background:var(' + cssVar + ')';
@@ -1962,20 +2070,23 @@ function entryColors() {
   }
   return colorCache.v;
 }
+const effMethod = () => (ui.method === 'card' && (ui.mode === 'income' || ui.mode === 'transfer')) ? 'account' : ui.method;
 function entryState() {
   const isTr = ui.mode === 'transfer';
   const names = accountNames();
+  const cnames = cardNames();
+  if (ui.method === 'card' && (!ui.card || !cnames.includes(ui.card))) ui.card = cnames[0] || '';
   const colors = entryColors();
   return {
-    mode: ui.mode, method: ui.method,
+    mode: ui.mode, method: effMethod(), cardOn: ui.mode !== 'income' && ui.mode !== 'transfer', cards: cnames, card: ui.card,
     accounts: (!isTr && ui.method === 'account' && names.length > 1) ? favChips(names, 'accounts', ui.account, ui.accOpen) : [],
     account: ui.account,
     catLabel: ui.mode === 'travel' ? 'Travel type' : 'Category',
     cats: isTr ? [] : favChips(listFor(ui.mode).map(c => parseItem(c).name), ui.mode, ui.category, ui.catOpen), category: ui.category,
-    ends: isTr ? [{ v: CASH_KEY, n: 'Cash' }].concat(names.map(n => ({ v: n, n }))) : [], from: ui.from, to: ui.to,
+    ends: isTr ? [{ v: CASH_KEY, n: 'Cash' }].concat(names.map(n => ({ v: n, n }))) : [], toEnds: isTr ? [{ v: CASH_KEY, n: 'Cash' }].concat(names.map(n => ({ v: n, n })), cnames.map(n => ({ v: CARD_PFX + n, n }))) : [], from: ui.from, to: ui.to,
     date: ui.date, saveTitle: $('#saveBtn').textContent,
     due: !$('#dueBanner').hidden ? $('#dueBanner').textContent : '',
-    setup: !hasBackend(), clear: entryClear, focus: entryFocus,
+    setup: !hasBackend(), clear: entryClear, fill: entryFill, focus: entryFocus,
     colors, accent: colors[ui.mode]
   };
 }
@@ -1984,6 +2095,7 @@ function entryAction(kind, v) {
   switch (kind) {
     case 'mode': ui.mode = v; ui.category = ''; ui.catOpen = false; renderEntry(); break;
     case 'method': ui.method = v; renderEntry(); break;
+    case 'card': ui.card = unT(v); renderEntry(); break;
     case 'account':
       if (v === '__more__' || v === '__less__') { ui.accOpen = v === '__more__'; renderEntry(); break; }
       ui.account = v; ui.accOpen = false; renderEntry(); break;
@@ -2011,7 +2123,7 @@ const segItems = pairs => pairs.map(([v, n]) => ({ v, n }));
 
 function txRow(t, mp) {
   const info = itemInfo(t, mp);
-  const end = (cash, name) => cash ? 'Cash' : (tn(name) || 'Account');
+  const end = (cash, name) => cash ? 'Cash' : (tn(acctLabel(name)) || 'Account');
   const way = t.type === 'transfer' ? end(t.method === 'cash', t.account) + ' → ' + end(t.sub === TO_CASH, t.sub) : end(t.method === 'cash', t.account);
   const sign = t.type === 'transfer' ? '' : t.type === 'income' ? '+' : '−';
   return { type: 'row', id: t.id, tap: true, del: t.id, icon: info.icon, title: info.title, sub: [way, t.note].filter(Boolean).join(' · '),
@@ -2091,7 +2203,7 @@ function summaryModel(colors) {
   };
   if (exp.length) {
     secs.push({ header: { title: 'Expenses by category' }, rows: [comp(groupSum(exp, t => t.travel ? TRAVEL : (tn(t.category) || NONE)))] });
-    secs.push({ header: { title: 'By payment method' }, rows: [comp(groupSum(exp, t => t.method === 'cash' ? 'Cash' : (tn(t.account) || 'Account')))] });
+    secs.push({ header: { title: 'By payment method' }, rows: [comp(groupSum(exp, t => t.method === 'cash' ? 'Cash' : (tn(acctLabel(t.account)) || 'Account')))] });
     const travel = exp.filter(t => t.travel);
     if (travel.length) secs.push({ header: { title: 'Travel', trailing: baht(sum(travel)) }, rows: [comp(groupSum(travel, t => tn(t.sub) || 'Other'))] });
   }
@@ -2127,7 +2239,7 @@ function summaryModel(colors) {
 const SETTINGS_LISTS = [['accounts', 'Accounts'], ['expense', 'Expense categories'], ['income', 'Income categories'], ['travel', 'Travel types'], ['people', 'People']];
 // pages inside Settings (iPhone app): [full name, short title shown in the top bar]
 const SET_SUBS = { open: ['Starting balances', 'Start balances'], accounts: ['Accounts', 'Accounts'], expense: ['Expense categories', 'Expenses'],
-  income: ['Income categories', 'Income'], travel: ['Travel types', 'Travel'], people: ['People', 'People'], connect: ['Google Sheet (old)', 'Google Sheet'], account: ['Account', 'Account'], backup: ['Backup & restore', 'Backup'], tax: ['Tax', 'Tax'], taxinc: ['Income categories', 'Income'] };
+  income: ['Income categories', 'Income'], travel: ['Travel types', 'Travel'], people: ['People', 'People'], cards: ['Credit cards', 'Cards'], connect: ['Google Sheet (old)', 'Google Sheet'], account: ['Account', 'Account'], backup: ['Backup & restore', 'Backup'], tax: ['Tax', 'Tax'], taxinc: ['Income categories', 'Income'] };
 const settingsTitle = () => (ui.page === 'settings' && ui.settingsSub) ? SET_SUBS[ui.settingsSub][1] : (ui.page === 'summary' && ui.sumView === 'balance') ? 'Balance' : (ui.page === 'summary' && ui.sumView === 'goals') ? 'Goals' : (ui.page === 'person') ? personName() : (ui.page === 'goal') ? goalName() : TITLES[ui.page];
 function settingsModel(colors) {
   const secs = [];
@@ -2148,7 +2260,7 @@ function settingsModel(colors) {
     const nav = (key, value) => ({ type: 'row', id: 'sub:' + key, tap: true, title: SET_SUBS[key][0], value, vk: 'muted', chevron: 'right', light: true });
     const nOpen = Object.keys(openingMap()).filter(k => Number(openingMap()[k])).length;
     secs.push({ header: { title: 'Your data' }, rows: [nav('open', nOpen ? String(nOpen) : '')].concat(SETTINGS_LISTS.map(([key]) => nav(key, String((draft[key] || []).length)))) });
-    secs.push({ rows: [nav('tax', ''), nav('backup', '')] });
+    secs.push({ rows: [nav('cards', String(cardsList().length || '')), nav('tax', ''), nav('backup', '')] });
     if (!fbUser) secs.push({ rows: [nav('connect', cfg.url ? 'Connected' : 'Not set')] });
     return Object.assign({ page: 'settings', sections: secs }, base);
   }
@@ -2160,6 +2272,12 @@ function settingsModel(colors) {
         value: String(r.key in openDraft ? openDraft[r.key] : (op[r.key] || '')) })) });
     secs.push({ rows: [{ type: 'button', id: 'reset', title: 'Reset starting balances', style: 'danger' }] });
     return Object.assign({ page: 'settings:open', sections: secs }, base);
+  }
+  if (sub === 'cards') {
+    const rows = cardsList().map(c => ({ type: 'row', id: 'cd:' + c.id, tap: true, title: c.name, sub: 'Limit ' + baht(Number(c.limit) || 0) + (c.cutoff ? ' · cut-off day ' + c.cutoff : '') + (c.due ? ' · due day ' + c.due : ''), chevron: 'right' }));
+    secs.push({ footer: 'Add your cards with their credit limit. Pick Credit card when you record an expense and the used amount is worked out for you.', rows: rows.length ? rows : [{ type: 'empty', text: 'No credit cards yet' }] });
+    secs.push({ rows: [{ type: 'button', id: 'cadd', title: '+ Add a credit card', glass: true }] });
+    return Object.assign({ page: 'settings:cards', sections: secs }, base);
   }
   if (sub === 'account') return accountModel(base);
   if (sub === 'backup') return backupModel(base);
@@ -2622,28 +2740,46 @@ function screenModel() {
   if (ui.page === 'goal') return goalPageModel(colors);
   if (ui.page === 'subs') {
     const all = sortedSubs(), tab = ui.billTab;
+    const cards = cardsList().map(c => ({ c, st: cardStatus(c) }));
     const list = tab === 'all' ? all : all.filter(x => subKind(x) === tab);
     const eom = ymd(new Date(todayDate().getFullYear(), todayDate().getMonth() + 1, 0));
     const dueNow = list.filter(x => x.next <= eom);
-    const total = dueNow.reduce((s, x) => s + curAmt(x), 0);
+    const cardDue = (tab === 'all') ? cards.filter(k => k.st.billed > 0 && k.st.due && ymd(k.st.due) <= eom) : [];
+    const total = tab === 'card' ? cards.reduce((a, k) => a + Math.max(k.st.used, 0), 0) : dueNow.reduce((a, x) => a + curAmt(x), 0) + cardDue.reduce((a, k) => a + k.st.billed, 0);
     const cnt = k => dueNow.filter(x => subKind(x) === k).length;
     const parts = [];
-    if (cnt('bill')) parts.push(cnt('bill') + (cnt('bill') === 1 ? ' bill' : ' bills'));
-    if (cnt('sub')) parts.push(cnt('sub') + (cnt('sub') === 1 ? ' subscription' : ' subscriptions'));
-    if (cnt('card')) parts.push(cnt('card') + (cnt('card') === 1 ? ' card plan' : ' card plans'));
-    const small = tab === 'bill' ? 'Bills due this month' : tab === 'sub' ? 'Subscriptions due this month' : tab === 'card' ? 'Credit cards due this month' : 'Due this month';
-    const label = x => { const k = subKind(x); return k === 'card' ? 'Credit card · ' + x.plan.length + ' left' : (k === 'bill' ? 'Bill · ' : 'Subscription · ') + (x.cycle === 'year' ? 'Yearly' : 'Monthly'); };
-    return { page: 'subs', colors, sections: [
+    if (tab === 'card') {
+      const lim = cards.reduce((a, k) => a + k.st.limit, 0);
+      if (cards.length) parts.push(cards.length + (cards.length === 1 ? ' card' : ' cards') + ' · ' + baht(Math.round((lim - total) * 100) / 100) + ' available');
+    } else {
+      if (cnt('bill')) parts.push(cnt('bill') + (cnt('bill') === 1 ? ' bill' : ' bills'));
+      if (cnt('sub')) parts.push(cnt('sub') + (cnt('sub') === 1 ? ' subscription' : ' subscriptions'));
+      if (cnt('card')) parts.push(cnt('card') + (cnt('card') === 1 ? ' installment' : ' installments'));
+      if (cardDue.length) parts.push(cardDue.length + (cardDue.length === 1 ? ' card statement' : ' card statements'));
+    }
+    const small = tab === 'bill' ? 'Bills due this month' : tab === 'sub' ? 'Subscriptions due this month' : tab === 'card' ? 'Owed on credit cards' : 'Due this month';
+    const label = x => { const k = subKind(x); return k === 'card' ? 'Installment · ' + x.plan.length + ' left' : (k === 'bill' ? 'Bill · ' : 'Subscription · ') + (x.cycle === 'year' ? 'Yearly' : 'Monthly'); };
+    const planRow = x => { const d = daysUntil(x.next);
+      return { type: 'row', id: x.id, tap: true, title: x.name, sub: label(x) + ' · ' + subAcc(x.acc),
+        value: (x.kind === 'bill' ? '~' : '') + baht(curAmt(x)), caption: dueText(d, x.next), ck: d < 0 ? 'over' : (d <= Math.max(x.remind, 0) && x.remind >= 0 ? 'soon' : ''),
+        button: { id: x.id, title: 'Paid' } }; };
+    const cardRow = k => ({ type: 'row', id: 'c:' + k.c.id, tap: true, title: k.c.name,
+      sub: baht(k.st.avail) + ' left of ' + baht(k.st.limit), value: baht(Math.max(k.st.used, 0)),
+      caption: k.st.billed > 0 && k.st.due ? (k.st.dueIn < 0 ? dueText(k.st.dueIn, ymd(k.st.due)) : 'Due ' + dueText(k.st.dueIn, ymd(k.st.due)).replace(/^Due /, '').toLowerCase()) : (k.st.used > 0 ? 'Used' : 'Nothing owed'), ck: k.st.billed > 0 && k.st.dueIn !== null && k.st.dueIn < 0 ? 'over' : (k.st.billed > 0 && k.st.dueIn !== null && k.st.dueIn <= 3 ? 'soon' : ''),
+      button: k.st.used > 0 ? { id: 'pc:' + k.c.id, title: 'Pay' } : undefined });
+    const secs = [
       { rows: [{ type: 'seg', id: 'btab', plain: true, sel: tab, items: segItems([['all', 'All'], ['bill', 'Bills'], ['sub', 'Subs'], ['card', 'Cards']]) }] },
-      { rows: [{ type: 'hero', small, big: baht(Math.round(total * 100) / 100), unit: '', sub: parts.length ? parts.join(' · ') : 'Nothing due this month' }] },
-      { header: { title: 'Upcoming', action: { id: 'add', title: '+ Add' } },
-        rows: list.length ? list.map(x => {
-          const d = daysUntil(x.next);
-          return { type: 'row', id: x.id, tap: true, title: x.name, sub: label(x) + ' · ' + subAcc(x.acc),
-            value: (x.kind === 'bill' ? '~' : '') + baht(curAmt(x)), caption: dueText(d, x.next), ck: d < 0 ? 'over' : (d <= Math.max(x.remind, 0) && x.remind >= 0 ? 'soon' : ''),
-            button: { id: x.id, title: 'Paid' } };
-        }) : [{ type: 'empty', text: 'Nothing here yet' }] }
-    ] };
+      { rows: [{ type: 'hero', small, big: baht(Math.round(total * 100) / 100), unit: '', sub: parts.length ? parts.join(' · ') : (tab === 'card' ? 'No credit cards yet' : 'Nothing due this month') }] }
+    ];
+    if (tab === 'card') {
+      secs.push({ header: { title: 'Cards', action: { id: 'addcard', title: '+ Add' } }, rows: cards.length ? cards.map(cardRow) : [{ type: 'empty', text: 'Add a credit card to track its limit' }] });
+      secs.push({ header: { title: 'Installments' }, rows: list.length ? list.map(planRow) : [{ type: 'empty', text: 'No installment plans' }] });
+      secs.push({ rows: [{ type: 'button', id: 'addplan', title: '+ Add installment plan', glass: true }] });
+    } else {
+      secs.push({ header: { title: 'Upcoming', action: { id: 'add', title: '+ Add' } }, rows: list.length ? list.map(planRow) : [{ type: 'empty', text: 'Nothing here yet' }] });
+      if (tab === 'all' && cards.length) secs.push({ header: { title: 'Credit cards' }, rows: cards.map(cardRow) });
+    }
+    return { page: 'subs', colors, sections: secs };
   }
   if (ui.page === 'recent') {
     const mp = maps();
@@ -2675,6 +2811,7 @@ function formColors(accentKey) { const c = entryColors(); return Object.assign({
 function editComplete() { return !!ed && parseAmount(ed.amount) > 0; }
 function formModel() {
   if (lf) return listForm();
+  if (cf) return cardForm();
   if (pf) return payForm();
   if (gf) return goalForm();
   if (ie) return itemForm();
@@ -2690,12 +2827,15 @@ function editForm() {
   const secs = [{ header: { title: 'Amount' }, rows: [{ type: 'field', id: 'amount', big: true, kbd: 'decimal', value: ed.amount, placeholder: '0.00' }] }];
   if (mode === 'transfer') {
     const items = [{ v: CASH_KEY, n: 'Cash' }].concat(names.map(n => ({ v: n, n })));
-    [ed.from, ed.to].forEach(v => { if (v && v !== CASH_KEY && !names.includes(v)) items.push({ v, n: v }); });
+    const toItems = items.concat(cardNames().map(n => ({ v: CARD_PFX + n, n })));
+    [ed.from, ed.to].forEach(v => { if (v && v !== CASH_KEY && !names.includes(v) && !isCardAcct(v)) items.push({ v, n: v }); });
+    if (isCardAcct(ed.to) && !toItems.some(i => i.v === ed.to)) toItems.push({ v: ed.to, n: acctLabel(ed.to) });
     secs.push({ header: { title: 'From' }, rows: [{ type: 'chips', id: 'efrom', sel: ed.from, items: chipItems(items) }] });
-    secs.push({ header: { title: 'To' }, rows: [{ type: 'chips', id: 'eto', sel: ed.to, items: chipItems(items) }] });
+    secs.push({ header: { title: 'To' }, rows: [{ type: 'chips', id: 'eto', sel: ed.to, items: chipItems(toItems) }] });
   } else {
     const accItems = names.map(n => ({ v: n, n })).concat([{ v: CASH_KEY, n: 'Cash' }]);
-    if (ed.acc && ed.acc !== CASH_KEY && !names.includes(ed.acc)) accItems.unshift({ v: ed.acc, n: ed.acc });
+    if (mode !== 'income') cardNames().forEach(n => accItems.push({ v: CARD_PFX + n, n }));
+    if (ed.acc && ed.acc !== CASH_KEY && !accItems.some(i => i.v === ed.acc)) accItems.unshift({ v: ed.acc, n: acctLabel(ed.acc) });
     const list = listFor(mode).map(x => parseItem(x).name);
     if (ed.category && !list.includes(ed.category)) list.push(ed.category);
     secs.push({ header: { title: mode === 'travel' ? 'Travel type' : 'Category' }, rows: [{ type: 'chips', id: 'ecat', sel: ed.category, items: chipItems(list.map(n => ({ v: n, n }))) }] });
@@ -2715,7 +2855,7 @@ function subForm() {
   const rem = [[-1, 'No reminder'], [0, 'On the day'], [1, '1 day before'], [3, '3 days before'], [7, '7 days before']];
   const card = sb.kind === 'card';
   const secs = [];
-  secs.push({ header: { title: 'Type' }, rows: [{ type: 'seg', id: 'skind', sel: sb.kind, items: segItems([['bill', 'Bill'], ['sub', 'Subscription'], ['card', 'Credit card']]) }] });
+  secs.push({ header: { title: 'Type' }, rows: [{ type: 'seg', id: 'skind', sel: sb.kind, items: segItems([['bill', 'Bill'], ['sub', 'Subscription'], ['card', 'Installment']]) }] });
   secs.push({ header: { title: 'Name' }, rows: [{ type: 'field', id: 'name', kbd: 'text', value: sb.name, placeholder: card ? 'e.g. iPhone installment' : sb.kind === 'bill' ? 'e.g. Electricity' : 'e.g. Netflix' }] });
   if (card) {
     secs.push({ header: { title: 'Installments left' }, rows: [{ type: 'field', id: 'n', lazy: true, kbd: 'number', value: String(sb.plan.length), placeholder: 'e.g. 6' }] });
@@ -2737,6 +2877,7 @@ function subForm() {
 
 function formAction(kind, v) {
   if (lf) { lfAction(kind, v); pushChrome(); return; }
+  if (cf) { cfAction(kind, v); pushChrome(); return; }
   if (pf) { pfAction(kind, v); pushChrome(); return; }
   if (gf) { gfAction(kind, v); pushChrome(); return; }
   if (ie) { ieAction(kind, v); pushChrome(); return; }
@@ -2790,10 +2931,10 @@ function addDraftItem(key, raw) {
 }
 
 function screenAction(kind, v) {
-  if (lf || pf || gf || ie || df || (sb && !$('#subSheet').hidden) || (ed && !$('#editSheet').hidden)) { formAction(kind, v); return; }
+  if (lf || cf || pf || gf || ie || df || (sb && !$('#subSheet').hidden) || (ed && !$('#editSheet').hidden)) { formAction(kind, v); return; }
   const o = (v && typeof v === 'object') ? v : {};
   if (kind === 'row') {
-    if (ui.page === 'subs') showSubDetail(v);
+    if (ui.page === 'subs') { if (String(v).startsWith('c:')) showCardDetail(String(v).slice(2)); else showSubDetail(v); }
     else if (ui.page === 'recent') openEdit(v);
     else if (ui.page === 'summary' && ui.sumView === 'goals') { if (String(v).indexOf('g:') === 0) openGoalPage(String(v).slice(2)); }
     else if (ui.page === 'summary') { if (ui.sumView === 'balance') showBalanceDetail(v); else if (v === 'detail') $('#detailToggle').click(); else openEdit(v); }
@@ -2807,6 +2948,7 @@ function screenAction(kind, v) {
     }
     else if (ui.page === 'balance') showBalanceDetail(v);
     else if (ui.page === 'settings' && String(v).startsWith('ed:')) { const em = String(v).match(/^ed:(\w+):(\d+)$/); if (em) openListEdit(em[1], Number(em[2])); }
+    else if (ui.page === 'settings' && String(v).startsWith('cd:')) openCardForm(String(v).slice(3));
     else if (ui.page === 'settings' && String(v).startsWith('sub:')) { ui.settingsSub = String(v).slice(4); if (!SET_SUBS[ui.settingsSub]) ui.settingsSub = ''; }
   }
   else if (kind === 'button') {
@@ -2815,13 +2957,14 @@ function screenAction(kind, v) {
       if (v === 'gedit') openGoalForm(ui.goal);
       else if (v === 'gdelp') deleteGoal(ui.goal);
     }
-    else if (ui.page === 'subs') payTap(v);
+    else if (ui.page === 'subs') { if (String(v).startsWith('pc:')) payCard(String(v).slice(3)); else if (v === 'addplan') { ui.billTab = 'card'; openSub(''); } else payTap(v); }
     else if (ui.page === 'recent') { if (v === 'more') { ui.recentN += 50; renderRecent(); } }
     else if (ui.page === 'profile') { if (v === 'rmphoto') setProfile({ photo: '' }); }
     else if (ui.page === 'person') { if (v === 'paidall') { const p = peopleStat().find(x => x.key === ui.person); if (p) openPayForm(p.entries.filter(e => !e.paid && isItem(e)).map(e => e.id)); } }
     else if (ui.page === 'settings') {
       const fm = String(v).match(/^fav:(\w+):(\d+)$/);
-      if (fm) toggleFav(fm[1], Number(fm[2]));
+      if (v === 'cadd') openCardForm('');
+      else if (fm) toggleFav(fm[1], Number(fm[2]));
       else if (v === 'reset') resetSub();
       else if (v === 'test') testConn();
       else if (v === 'signin') acctSubmit();
@@ -2843,6 +2986,7 @@ function screenAction(kind, v) {
   }
   else if (kind === 'action') {
     if (ui.page === 'subs' && v === 'add') openSub('');
+    else if (ui.page === 'subs' && v === 'addcard') openCardForm('');
     else if (ui.page === 'summary' && v === 'bud') $('#budEdit').click();
     else if (ui.page === 'debts' && v === 'add') openDebtForm('split');
   }

@@ -560,11 +560,12 @@
         h('button', { class: 'w-swap', onclick: () => send('entry', 'swap', 0) }, svg('swap', false, 16), h('span', { text: L('Swap') }))));
       card.appendChild(h('div', { class: 'w-eg' },
         h('div', { class: 'w-label', text: L('To') }),
-        chipFlow(ends, e.to, v => send('entry', 'to', v))));
+        chipFlow(e.toEnds || ends, e.to, v => send('entry', 'to', v))));
     } else {
       card.appendChild(h('div', { class: 'w-eg' },
         h('div', { class: 'w-label', text: L(e.mode === 'income' ? 'Received in' : 'Paid / received via') }),
-        seg([{ v: 'account', n: L('Account') }, { v: 'cash', n: L('Cash') }], e.method, v => send('entry', 'method', v)),
+        seg([{ v: 'account', n: L('Account') }, { v: 'cash', n: L('Cash') }].concat(e.cardOn ? [{ v: 'card', n: L('Credit card') }] : []), e.method, v => send('entry', 'method', v)),
+        e.method === 'card' ? ((e.cards || []).length ? chipFlow(e.cards.map(n => ({ v: n, n })), e.card, v => send('entry', 'card', v)) : h('div', { class: 'w-rn', text: L('Add a credit card in Settings first') })) :
         (e.accounts || []).length ? chipFlow(e.accounts.map(n => ({ v: n, n })), e.account, v => send('entry', 'account', v)) : null));
       card.appendChild(h('div', { class: 'w-eg' },
         h('div', { class: 'w-label', text: e.catLabel }),
@@ -582,7 +583,7 @@
     wrap.appendChild(card);
     main.appendChild(wrap);
     main.scrollTop = st;
-    if (e.clear !== entryClear) { entryClear = e.clear; amt.value = ''; note.value = ''; size(); }
+    if (e.clear !== entryClear) { entryClear = e.clear; amt.value = e.fill || ''; note.value = ''; size(); }
     if (e.focus !== entryFocus) { entryFocus = e.focus; amt.focus(); }
     else if (hadFocus) { const n = main.querySelector('[data-rid="' + hadFocus + '"]'); if (n) { n.focus(); } }
   }
