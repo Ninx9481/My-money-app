@@ -1868,9 +1868,7 @@ function profileModel(colors) {
   const th = curLang() === 'th', loc = th ? 'th-TH-u-ca-gregory' : 'en-GB';
   const pr = settings.profile || {};
   const secs = [];
-  secs.push({ rows: [{ type: 'avatar', id: 'photo', tap: true, photo: pr.photo || '', name: profileName() || (th ? 'ชื่อของคุณ' : 'Your name'), sub: fbUser ? fbUser.email : '' }] });
-  secs.push({ header: { title: 'Name' }, rows: [{ type: 'field', id: 'pname', lazy: true, title: '', placeholder: 'Your name', value: String(pr.name || '') }] });
-  if (pr.photo) secs.push({ rows: [{ type: 'button', id: 'rmphoto', title: 'Remove photo', style: 'danger' }] });
+  secs.push({ rows: [{ type: 'avatar', id: 'photo', tap: true, photo: pr.photo || '', name: profileName() || (th ? 'ชื่อของคุณ' : 'Your name'), sub: fbUser ? fbUser.email : '', rm: !!pr.photo, editId: 'pname', raw: String(pr.name || '') }] });
   const dates = tx.map(t => t.date).filter(Boolean).sort();
   const rows = [];
   if (dates.length) {
@@ -2765,6 +2763,7 @@ function screenAction(kind, v) {
     else if (ui.page === 'person') showItemDetail(String(v));
     else if (ui.page === 'profile') {
       if (v === 'photo') { const hh = chromeH(); if (hh) hh.postMessage({ photo: 1 }); }
+      else if (v === 'rmphoto') setProfile({ photo: '' });
       else if (v === 'settings') { ui.viaProfile = true; $('#settingsBtn').click(); }
       else if (v === 'tax') { ui.viaProfile = true; openSettings('tax'); }
     }

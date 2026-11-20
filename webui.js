@@ -24,7 +24,7 @@
     'Or sign in with': 'หรือเข้าสู่ระบบด้วย', 'Or sign up with': 'หรือสมัครด้วย', 'Continue with Google': 'ดำเนินการต่อด้วย Google',
     'Sign in': 'เข้าสู่ระบบ', 'Create account': 'สร้างบัญชี', 'Forgot password?': 'ลืมรหัสผ่าน?', 'Password': 'รหัสผ่าน', 'Confirm password': 'ยืนยันรหัสผ่าน',
     'Delete goal': 'ลบเป้าหมาย', 'Goal options': 'ตัวเลือกเป้าหมาย', 'Change photo': 'เปลี่ยนรูป', 'Profile': 'โปรไฟล์', 'Edit goal': 'แก้ไขเป้าหมาย', 'Savings goal': 'เป้าหมายออม', 'Your account': 'บัญชีของคุณ',
-    'Welcome back': 'ยินดีต้อนรับกลับมา', 'Sync Complete': 'ซิงก์สำเร็จ', 'Create your account': 'สร้างบัญชีของคุณ', 'Sign in to sync your expenses and accounts.': 'เข้าสู่ระบบเพื่อซิงก์รายการและบัญชีของคุณ'
+    'Welcome back': 'ยินดีต้อนรับกลับมา', 'Sync Complete': 'ซิงก์สำเร็จ', 'Choose photo': 'เลือกรูป', 'Edit name': 'แก้ไขชื่อ', 'Create your account': 'สร้างบัญชีของคุณ', 'Sign in to sync your expenses and accounts.': 'เข้าสู่ระบบเพื่อซิงก์รายการและบัญชีของคุณ'
   };
   const L = s => (isTh() ? (LOC[s] || tr(s)) : s);
 
@@ -627,11 +627,25 @@
         h('div', { class: 'wcol' }, h('div', { class: 'l', text: it.l || '' }), h('div', { class: 'v ' + (it.k || ''), text: it.v || '' }))));
       case 'avatar': {
         const pic = h('span', { class: 'w-av-big' + (r.photo ? ' has' : '') }, r.photo ? h('img', { src: r.photo, alt: '' }) : svg('person', false, 56));
-        const el = h('div', { class: 'w-avatar' + (r.tap ? ' tap' : '') },
-          h('span', { class: 'w-av-hold' }, pic, r.tap ? h('span', { class: 'w-av-badge' }, svg('camera', false, 17)) : null),
-          h('div', { class: 'nm', text: r.name || '' }), r.sub ? h('div', { class: 'sb', text: r.sub }) : null);
-        if (r.tap) { el.setAttribute('role', 'button'); el.setAttribute('aria-label', L('Change photo')); el.tabIndex = 0; el.addEventListener('click', () => send('screen', 'row', id)); }
-        return el;
+        const badge = r.tap ? h('button', { class: 'w-av-badge', 'aria-label': L('Change photo'), onclick: ev => {
+          ev.stopPropagation();
+          const items = [{ title: L('Choose photo'), icon: 'photo', run: () => send('screen', 'row', id) }];
+          if (r.rm) items.push({ title: L('Remove photo'), icon: 'trash', bad: true, run: () => send('screen', 'row', 'rmphoto') });
+          openMenu(ev.currentTarget, items);
+        } }, svg('camera', false, 17)) : null;
+        const nm = h('div', { class: 'nm' }, h('span', { text: r.name || '' }));
+        if (r.editId) {
+          const pen = h('button', { class: 'w-pen', 'aria-label': L('Edit name'), onclick: () => {
+            const inp = h('input', { class: 'w-nameinp', type: 'text', value: r.raw || '', placeholder: L('Your name'), maxlength: '40', enterkeyhint: 'done' });
+            let done = false;
+            const commit = ok => { if (done) return; done = true; if (ok) send('screen', 'field', { id: r.editId, v: inp.value }); else { nm.textContent = ''; nm.append(h('span', { text: r.name || '' }), pen); } };
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(true); } else if (e.key === 'Escape') commit(false); });
+            inp.addEventListener('blur', () => commit(true));
+            nm.textContent = ''; nm.appendChild(inp); inp.focus(); inp.select();
+          } }, svg('pencil', false, 16));
+          nm.appendChild(pen);
+        }
+        return h('div', { class: 'w-avatar' }, h('span', { class: 'w-av-hold' }, pic, badge), nm, r.sub ? h('div', { class: 'sb', text: r.sub }) : null);
       }
       case 'photo': {
         const box = h('div', { class: 'w-photo' + (r.photo ? ' has' : '') }, r.photo ? h('img', { src: r.photo, alt: '' }) : h('div', { class: 'hint' }, svg('photo', false, 36), h('span', { text: r.title || '' })));
