@@ -208,7 +208,7 @@ function itemInfo(t, mp) {
 
 function itemHTML(t, mp, showDate) {
   const info = itemInfo(t, mp);
-  const end = (cash, name) => cash ? '💵 Cash' : acctIcon(mp, name) + ' ' + (tn(name) || 'Account');
+  const end = (cash, name) => cash ? 'Cash' : (tn(name) || 'Account');
   const way = t.type === 'transfer' ? end(t.method === 'cash', t.account) + ' → ' + end(t.sub === TO_CASH, t.sub) : end(t.method === 'cash', t.account);
   const sub = [showDate ? dateLabel(t.date) : '', way, t.note].filter(Boolean).map(esc).join(' · ');
   const sign = t.type === 'transfer' ? '' : t.type === 'income' ? '+' : '−';
@@ -1980,7 +1980,7 @@ const segItems = pairs => pairs.map(([v, n]) => ({ v, n }));
 
 function txRow(t, mp) {
   const info = itemInfo(t, mp);
-  const end = (cash, name) => cash ? '💵 Cash' : acctIcon(mp, name) + ' ' + (tn(name) || 'Account');
+  const end = (cash, name) => cash ? 'Cash' : (tn(name) || 'Account');
   const way = t.type === 'transfer' ? end(t.method === 'cash', t.account) + ' → ' + end(t.sub === TO_CASH, t.sub) : end(t.method === 'cash', t.account);
   const sign = t.type === 'transfer' ? '' : t.type === 'income' ? '+' : '−';
   return { type: 'row', id: t.id, tap: true, del: t.id, icon: info.icon, title: info.title, sub: [way, t.note].filter(Boolean).join(' · '),
