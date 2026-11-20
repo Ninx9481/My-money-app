@@ -416,3 +416,6 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
 .w-banner-x { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
 .w-banner-x:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
 .w-banner-x:active { transform: translateY(-50%) scale(.92); }
+
+/* the three Income / Expenses / Balance tiles carry their own borders: no extra frame behind them */
+.w-list > .w-sec:has(.w-totals) .w-group, .w-group.bare { background: transparent !important; box-shadow: none !important; overflow: visible; border-radius: 0; }
