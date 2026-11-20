@@ -729,9 +729,9 @@ function openListEdit(sub, i) {
 function listForm() {
   const secs = [
     { header: { title: 'Name' }, footer: lf.orig !== lf.name.trim() ? 'Past entries keep the old name. Stars, budgets and tax settings follow the new one.' : '', rows: [{ type: 'field', id: 'lname', left: true, kbd: 'text', value: lf.name, placeholder: 'Name' }] },
-    { header: { title: 'Emoji' }, footer: 'Pick one or type your own. Leave it empty for none.', rows: [
+    ...(lf.sub === 'accounts' ? [] : [{ header: { title: 'Emoji' }, footer: 'Pick one or type your own. Leave it empty for none.', rows: [
       { type: 'field', id: 'lemoji', left: true, kbd: 'text', value: lf.icon, placeholder: '🙂' },
-      { type: 'chips', id: 'lemo', sel: lf.icon, items: EMOJI_PICKS.map(e => ({ v: e, n: e })) }] },
+      { type: 'chips', id: 'lemo', sel: lf.icon, items: EMOJI_PICKS.map(e => ({ v: e, n: e })) }] }]),
     { rows: [{ type: 'button', id: 'ldel', title: 'Delete this item', style: 'danger' }] }
   ];
   return { page: 'form-list-' + formSession, colors: formColors('trv'), nonce: screenNonce, sections: secs };
@@ -755,7 +755,7 @@ async function deleteListItem() {
 }
 function saveListEdit() {
   if (!lfComplete()) { if (lf && lfNameTaken()) toast('Already in the list'); lf = null; pushChrome(); return; }
-  const name = lf.name.trim(), raw = (lf.icon ? lf.icon + ' ' : '') + name;
+  const name = lf.name.trim(), raw = (lf.icon && lf.sub !== 'accounts' ? lf.icon + ' ' : '') + name;
   draft[lf.sub][lf.i] = raw;
   if (name !== lf.orig) renameQ.push({ sub: lf.sub, from: lf.orig, to: name });
   lf = null; render(); toast('Saved');
@@ -2148,8 +2148,8 @@ function settingsModel(colors) {
   // a list: drag the handles to reorder, tap − to remove
   const starable = sub === 'accounts' || sub === 'expense' || sub === 'income' || sub === 'travel';
   const rows = (draft[sub] || []).map((raw, i) => {
-    const r = IOS ? { type: 'row', icon: parseItem(raw).icon, title: parseItem(raw).name, del: 'li:' + sub + ':' + i, move: sub }
-                  : { type: 'row', id: 'ed:' + sub + ':' + i, tap: true, icon: parseItem(raw).icon, title: parseItem(raw).name, move: sub };
+    const r = IOS ? { type: 'row', icon: sub === 'accounts' ? '' : parseItem(raw).icon, title: parseItem(raw).name, del: 'li:' + sub + ':' + i, move: sub }
+                  : { type: 'row', id: 'ed:' + sub + ':' + i, tap: true, icon: sub === 'accounts' ? '' : parseItem(raw).icon, title: parseItem(raw).name, move: sub };
     if (starable) r.button = { id: 'fav:' + sub + ':' + i, symbol: favOf(sub).includes(parseItem(raw).name) ? 'star.fill' : 'star', on: favOf(sub).includes(parseItem(raw).name) };
     return r;
   });
