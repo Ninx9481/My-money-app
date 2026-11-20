@@ -436,3 +436,7 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
 .w-group.dragging { overflow: visible; }
 .w-field.left, .w-row.field .w-field.left { text-align: left; }
 .w-row.w-dragrow .w-move { display: none; }
+
+/* ≡ handle: shows that a row can be held and dragged */
+.w-grip { display: inline-flex; flex: none; align-items: center; justify-content: center; color: var(--muted); opacity: .7; touch-action: none; cursor: grab; margin: -8px -6px -8px 0; padding: 8px 6px; }
+.w-group.dragging .w-row.lifting .w-grip { cursor: grabbing; opacity: 1; }
