@@ -24,7 +24,7 @@
     'Or sign in with': 'หรือเข้าสู่ระบบด้วย', 'Or sign up with': 'หรือสมัครด้วย', 'Continue with Google': 'ดำเนินการต่อด้วย Google',
     'Sign in': 'เข้าสู่ระบบ', 'Create account': 'สร้างบัญชี', 'Forgot password?': 'ลืมรหัสผ่าน?', 'Password': 'รหัสผ่าน', 'Confirm password': 'ยืนยันรหัสผ่าน',
     'Delete goal': 'ลบเป้าหมาย', 'Goal options': 'ตัวเลือกเป้าหมาย', 'Change photo': 'เปลี่ยนรูป', 'Profile': 'โปรไฟล์', 'Edit goal': 'แก้ไขเป้าหมาย', 'Savings goal': 'เป้าหมายออม', 'Your account': 'บัญชีของคุณ',
-    'Welcome back': 'ยินดีต้อนรับกลับมา', 'Create your account': 'สร้างบัญชีของคุณ', 'Sign in to sync your expenses and accounts.': 'เข้าสู่ระบบเพื่อซิงก์รายการและบัญชีของคุณ'
+    'Welcome back': 'ยินดีต้อนรับกลับมา', 'Sync Complete': 'ซิงก์สำเร็จ', 'Create your account': 'สร้างบัญชีของคุณ', 'Sign in to sync your expenses and accounts.': 'เข้าสู่ระบบเพื่อซิงก์รายการและบัญชีของคุณ'
   };
   const L = s => (isTh() ? (LOC[s] || tr(s)) : s);
 
@@ -234,6 +234,8 @@
     // top bar
     const sheetOn = !!(m.form && m.sheet);
     if (m.page !== lastPage) closeMenu();
+    if (lastSync === 'busy' && m.sync === 'ok') showSynced();
+    lastSync = m.sync || '';
     const barKey = JSON.stringify([m.title, m.back, m.page, m.sync, m.syncText, tabsShown(m), m.lang]);
     if (barKey !== last.bar) { last.bar = barKey; renderTop(m); }
     // tab bar
@@ -302,8 +304,10 @@
     left.appendChild(h('h1', { class: sub ? 'sub' : '', text: m.title || 'Lemoney' }));
     const right = h('div', { class: 'r' });
     const st = m.sync || '';
-    const pill = h('button', { class: 'w-sync ' + st, 'aria-label': L('Sync data'), onclick: () => act('sync') }, h('i'), h('span', { text: m.syncText || '—' }));
-    right.appendChild(pill);
+    if (st !== 'ok' && st !== 'busy') {
+      const pill = h('button', { class: 'w-sync ' + st, 'aria-label': L('Sync data'), onclick: () => act('sync') }, h('i'), h('span', { text: m.syncText || '—' }));
+      right.appendChild(pill);
+    }
     if (!sub) {
       right.appendChild(h('button', { class: 'w-ib', 'aria-label': L('Recent entries'), onclick: () => act('recent') }, svg('clock')));
       right.appendChild(avatarBtn());
@@ -405,6 +409,15 @@
   function showToast(t) {
     toastEl.textContent = t; toastEl.classList.add('show');
     clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 2000);
+  }
+  let lastSync = '', syncT;
+  const syncEl = h('div', { class: 'w-synced', role: 'status' }, h('i', { html: '' }), h('span'));
+  root.appendChild(syncEl);
+  function showSynced() {
+    syncEl.querySelector('i').innerHTML = '<svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="10" r="10" fill="currentColor"/><path d="M5.6 10.4l3 3 5.8-6.2" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    syncEl.querySelector('span').textContent = L('Sync Complete');
+    syncEl.classList.add('show');
+    clearTimeout(syncT); syncT = setTimeout(() => syncEl.classList.remove('show'), 2200);
   }
   function showAlert(a) {
     alertEl.textContent = '';
