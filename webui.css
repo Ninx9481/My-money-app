@@ -480,3 +480,7 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
 .w-avatar .nm .w-pen { width: 34px; height: 34px; color: var(--text); opacity: .7; }
 .w-avatar .nm .w-pen svg { width: 18px; height: 18px; }
 .w-avatar .nm .w-pen:hover { opacity: 1; background: color-mix(in srgb, var(--text) 8%, transparent); }
+.w-avatar .nm.editing .w-nameno { right: auto; left: calc(50% + min(110px, 28vw) + 8px + 38px + 8px); }
+.w-avatar .nm.editing { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.w-avatar .nm.editing .w-nameinp { width: min(190px, 46vw); margin: 0; }
+.w-avatar .nm.editing .w-nameok, .w-avatar .nm.editing .w-nameno { position: static; transform: none; left: auto; right: auto; }
