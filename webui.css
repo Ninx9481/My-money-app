@@ -401,3 +401,10 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
 .w-tab:active, .w-btn:active, .w-pill:active, .w-ib:active, .w-round:active, .w-chip:active { transform: scale(.94); }
 .w-row.tap:active, .w-bar.tap:active, .w-avatar.tap:active, .w-photorow.tap:active { transform: scale(.985); }
 @media (prefers-reduced-motion: reduce) { .w-alert, .w-sheet-wrap.enter .w-sheet, .w-sheet-wrap.enter .w-backdrop, .w-menu { animation: none !important; } .w-tab, .w-btn, .w-pill, .w-ib, .w-row.tap { transition: none; } }
+
+/* ---- first thing on every phone page sits the same distance (14px) under the top bar ---- */
+@media (max-width: 899px) {
+  .w-main[data-page="entry"] { padding-top: 14px; }
+  .w-list > .w-sec:first-child .w-segrow.plain { margin-top: -4px; }
+  .w-list > .w-search:first-child { margin-top: 10px; }
+}
