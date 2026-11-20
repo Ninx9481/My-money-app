@@ -452,3 +452,7 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
 .w-synced.show { opacity: 1; transform: none; }
 .w-synced i { display: inline-flex; color: #34c759; }
 @media (min-width: 900px) { .w-synced { top: 18px; right: 24px; } }
+@media (max-width: 899px) {
+  .w-synced { right: auto; left: 50%; transform: translate(-50%, -10px) scale(.96); white-space: nowrap; }
+  .w-synced.show { transform: translate(-50%, 0); }
+}
