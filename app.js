@@ -233,8 +233,9 @@ const acctLabel = a => isCardAcct(a) ? String(a).slice(CARD_PFX.length) : a;
 const cardsList = () => Array.isArray(settings.cards) ? settings.cards : [];
 const cardNames = () => cardsList().map(c => c.name);
 const cardKey = c => CARD_PFX + c.name;
-function cardUsed(c) {
+function cardUsed(c, withPlans = true) {
   const k = cardKey(c); let u = Number(c.open) || 0;
+  if (withPlans) subsList().forEach(x => { if (isCard(x) && x.acc === k) u += x.plan.reduce((a, v) => a + v, 0); });   // installments still to pay already use up the limit
   tx.forEach(t => {
     if (t.type === 'transfer') { if (t.sub === k) u -= t.amount; }
     else if (t.account === k) { if (t.type === 'income') u -= t.amount; else u += t.amount; }
@@ -251,10 +252,10 @@ function cardStatus(c) {
     due = clamp(base.getFullYear(), base.getMonth(), dd);
     if (due <= base || (!lastCut && due < today)) due = clamp(base.getFullYear(), base.getMonth() + 1, dd);
   }
-  const used = cardUsed(c), limit = Number(c.limit) || 0, k = cardKey(c), cs = lastCut ? ymd(lastCut) : '';
+  const used = cardUsed(c), usedTx = cardUsed(c, false), limit = Number(c.limit) || 0, k = cardKey(c), cs = lastCut ? ymd(lastCut) : '';
   const fresh = lastCut ? tx.filter(t => t.type !== 'transfer' && t.type !== 'income' && t.account === k && t.date > cs).reduce((a, t) => a + t.amount, 0) : 0;
-  const billed = Math.max(0, Math.round((used - fresh) * 100) / 100);
-  return { used, limit, avail: Math.round((limit - used) * 100) / 100, fresh: Math.round(fresh * 100) / 100, billed, lastCut, due, dueIn: due ? Math.round((due - today) / 86400000) : null };
+  const billed = Math.max(0, Math.round((usedTx - fresh) * 100) / 100), owedNow = Math.max(0, usedTx);
+  return { used, owedNow, limit, avail: Math.round((limit - used) * 100) / 100, fresh: Math.round(fresh * 100) / 100, billed, lastCut, due, dueIn: due ? Math.round((due - today) / 86400000) : null };
 }
 // Starred items (Settings › list › ★) are the only chips the Add page shows until the chevron is tapped.
 const favOf = key => ((settings.fav && settings.fav[key]) || []);
@@ -1654,7 +1655,7 @@ function payCard(id) {
   const st = cardStatus(c);
   ui.mode = 'transfer'; ui.to = cardKey(c); ui.from = accountNames()[0] || CASH_KEY; if (ui.from === ui.to) ui.from = '';
   ui.category = ''; entryClear++;
-  const amt = st.billed > 0 ? st.billed : Math.max(st.used, 0);
+  const amt = st.billed > 0 ? st.billed : st.owedNow;
   entryFill = amt > 0 ? String(amt) : ''; $('#amount').value = entryFill; sizeAmount();
   showPage('entry'); renderEntry();
 }
@@ -2770,7 +2771,7 @@ function screenModel() {
     const cardRow = k => ({ type: 'row', id: 'c:' + k.c.id, tap: true, title: k.c.name,
       sub: baht(k.st.avail) + ' left of ' + baht(k.st.limit), value: baht(Math.max(k.st.used, 0)),
       caption: k.st.billed > 0 && k.st.due ? (k.st.dueIn < 0 ? dueText(k.st.dueIn, ymd(k.st.due)) : 'Due ' + dueText(k.st.dueIn, ymd(k.st.due)).replace(/^Due /, '').toLowerCase()) : (k.st.used > 0 ? 'Used' : 'Nothing owed'), ck: k.st.billed > 0 && k.st.dueIn !== null && k.st.dueIn < 0 ? 'over' : (k.st.billed > 0 && k.st.dueIn !== null && k.st.dueIn <= 3 ? 'soon' : ''),
-      button: k.st.used > 0 ? { id: 'pc:' + k.c.id, title: 'Pay' } : undefined });
+      button: k.st.owedNow > 0 ? { id: 'pc:' + k.c.id, title: 'Pay' } : undefined });
     const secs = [
       { rows: [{ type: 'seg', id: 'btab', plain: true, sel: tab, items: segItems([['all', 'All'], ['bill', 'Bills'], ['sub', 'Subs'], ['card', 'Cards']]) }] },
       { rows: [{ type: 'hero', small, big: baht(Math.round(total * 100) / 100), unit: '', sub: parts.length ? parts.join(' · ') : (tab === 'card' ? 'No credit cards yet' : 'Nothing due this month') }] }
