@@ -493,6 +493,9 @@
     });
     return el;
   }
+  function dueDismissed(set) {
+    try { if (set !== undefined) localStorage.setItem('dueDismissed', set); return localStorage.getItem('dueDismissed') || ''; } catch (err) { return ''; }
+  }
   function renderEntry(e) {
     const prevAmount = entryEl.amount ? entryEl.amount.value : '', prevNote = entryEl.note ? entryEl.note.value : '';
     const hadFocus = document.activeElement && main.contains(document.activeElement) ? document.activeElement.dataset.rid : '';
@@ -500,8 +503,11 @@
     main.textContent = '';
     const acc = e.accent || 'var(--trv)';
     const wrap = h('div', { class: 'w-entry', style: '--accent:' + acc });
-    if (e.setup || e.due) {
-      wrap.appendChild(h('button', { class: 'w-banner', onclick: () => send('entry', e.setup ? 'setup' : 'due', 0), text: e.setup ? L('Not connected to Google Sheet yet — tap to set up') : e.due }));
+    const dueGone = e.due && dueDismissed() === e.due;      // closed with ✕; comes back when the text changes (a new day or another subscription)
+    if (e.setup || (e.due && !dueGone)) {
+      const bn = h('div', { class: 'w-banner-row' }, h('button', { class: 'w-banner', onclick: () => send('entry', e.setup ? 'setup' : 'due', 0), text: e.setup ? L('Not connected to Google Sheet yet — tap to set up') : e.due }));
+      if (!e.setup) bn.appendChild(h('button', { class: 'w-banner-x', 'aria-label': L('Close'), onclick: () => { dueDismissed(e.due); bn.remove(); } }, svg('x', false, 14)));
+      wrap.appendChild(bn);
     }
     const card = h('div', { class: 'w-card wentry' });
     const modes = [['expense', 'Expense'], ['income', 'Income'], ['travel', 'Travel'], ['transfer', 'Transfer']];

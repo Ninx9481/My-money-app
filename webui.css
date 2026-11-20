@@ -408,3 +408,10 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
   .w-list > .w-sec:first-child .w-segrow.plain { margin-top: -4px; }
   .w-list > .w-search:first-child { margin-top: 10px; }
 }
+
+/* due-subscriptions banner with a close button on the right */
+.w-banner-row { position: relative; align-self: stretch; display: flex; }
+.w-banner-row .w-banner { flex: 1; padding-left: 44px; padding-right: 44px; }
+.w-banner-x { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+.w-banner-x:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+.w-banner-x:active { transform: translateY(-50%) scale(.92); }
