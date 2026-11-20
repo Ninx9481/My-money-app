@@ -23,6 +23,7 @@
     'Unlock': 'ปลดล็อก', 'OK': 'ตกลง', 'Cancel': 'ยกเลิก', 'Sync data': 'ซิงก์ข้อมูล', 'Recent entries': 'รายการล่าสุด', 'Settings': 'ตั้งค่า',
     'Or sign in with': 'หรือเข้าสู่ระบบด้วย', 'Or sign up with': 'หรือสมัครด้วย', 'Continue with Google': 'ดำเนินการต่อด้วย Google',
     'Sign in': 'เข้าสู่ระบบ', 'Create account': 'สร้างบัญชี', 'Forgot password?': 'ลืมรหัสผ่าน?', 'Password': 'รหัสผ่าน', 'Confirm password': 'ยืนยันรหัสผ่าน',
+    'Delete goal': 'ลบเป้าหมาย', 'Goal options': 'ตัวเลือกเป้าหมาย', 'Change photo': 'เปลี่ยนรูป', 'Profile': 'โปรไฟล์', 'Edit goal': 'แก้ไขเป้าหมาย', 'Savings goal': 'เป้าหมายออม', 'Your account': 'บัญชีของคุณ',
     'Welcome back': 'ยินดีต้อนรับกลับมา', 'Create your account': 'สร้างบัญชีของคุณ', 'Sign in to sync your expenses and accounts.': 'เข้าสู่ระบบเพื่อซิงก์รายการและบัญชีของคุณ'
   };
   const L = s => (isTh() ? (LOC[s] || tr(s)) : s);
@@ -58,7 +59,13 @@
     star: '<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/>', swap: '<path d="M8 4v16M8 4L4.5 7.5M8 4l3.5 3.5M16 20V4M16 20l-3.5-3.5M16 20l3.5-3.5"/>',
     eye: '<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
     eyeoff: '<path d="M3 3l18 18M10.6 6.2A9.5 9.5 0 0112 6c6.4 0 10 6 10 6a17 17 0 01-3.2 3.9M6.4 7.6A16.5 16.5 0 002 12s3.6 6.5 10 6.5c1.5 0 2.8-.3 4-.8"/>',
-    grip: '<path d="M8 9h8M8 15h8"/>', cog: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'
+    grip: '<path d="M8 9h8M8 15h8"/>', cog: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+    person: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
+    more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+    pencil: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+    photo: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/><path d="M19 2v6M16 5h6"/>'
   };
   const svg = (name, fill, size) => h('span', { class: 'wi', html: '<svg viewBox="0 0 24 24" width="' + (size || 22) + '" height="' + (size || 22) + '" fill="' + (fill ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICON[name] + '</svg>' });
 
@@ -88,7 +95,37 @@
     b.append(svg(icon, false, 24), h('span', { class: 'tl' }), h('i', { class: 'wdot', hidden: true }));
     tabBtns[page] = b; tabBar.appendChild(b);
   });
-  const sideSet = h('button', { class: 'w-side-set', onclick: () => act('settings') }, svg('cog', false, 20), h('span', { class: 'sl' }));
+  const sideAv = h('span', { class: 'w-av-mini' });
+  const sideSet = h('button', { class: 'w-side-set', onclick: () => act('profile') }, sideAv, h('span', { class: 'sl' }));
+  const menuEl = h('div', { class: 'w-menu-wrap', hidden: true });
+  root.appendChild(menuEl);
+  let avatar = '';
+  // the profile photo (or a person icon) inside a round button
+  function fillAvatar(el) {
+    el.textContent = '';
+    if (avatar) el.appendChild(h('img', { src: avatar, alt: '' }));
+    else el.appendChild(svg('person', false, 18));
+    el.classList.toggle('has', !!avatar);
+  }
+  const avatarBtn = () => { const b = h('button', { class: 'w-ib w-avbtn', 'aria-label': L('Profile'), onclick: () => act('profile') }); fillAvatar(b); return b; };
+  // small pop-up menu under a button (the ⋯ on a goal page)
+  function openMenu(anchor, items) {
+    menuEl.textContent = '';
+    const box = h('div', { class: 'w-menu', role: 'menu' });
+    items.forEach(it => box.appendChild(h('button', { class: it.bad ? 'bad' : '', role: 'menuitem', onclick: () => { closeMenu(); it.run(); } }, h('span', { text: it.title }), svg(it.icon, false, 18))));
+    menuEl.appendChild(box); menuEl.hidden = false;
+    const r = anchor.getBoundingClientRect(), rr = root.getBoundingClientRect();
+    box.style.top = (r.bottom - rr.top + 6) + 'px';
+    box.style.right = Math.max(8, rr.right - r.right) + 'px';
+    const f = box.querySelector('button'); if (f) f.focus();
+  }
+  function closeMenu() { menuEl.hidden = true; menuEl.textContent = ''; }
+  menuEl.addEventListener('click', e => { if (e.target === menuEl) closeMenu(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menuEl.hidden) closeMenu(); });
+  root.addEventListener('keydown', e => { const t = e.target; if ((e.key === 'Enter' || e.key === ' ') && t && t.getAttribute && t.getAttribute('role') === 'button' && t.tagName !== 'BUTTON') { e.preventDefault(); t.click(); } });
+  const goalMenu = () => h('button', { class: 'w-ib w-more', 'aria-label': L('Goal options'), onclick: ev => openMenu(ev.currentTarget, [
+    { title: L('Edit goal'), icon: 'pencil', run: () => act('goal-edit') },
+    { title: L('Delete goal'), icon: 'trash', bad: true, run: () => act('goal-delete') }]) }, svg('more', false, 22));
   tabBar.append(h('span', { class: 'w-grow' }), sideSet);
 
   let last = {}, lastPage = '', queued = null;
@@ -100,7 +137,10 @@
     if (m.alert) return showAlert(m.alert);
     if (m.share) return doShare(m.share);
     if (m.pick) return doPick();
+    if (m.photo) return doPhoto(m.photo);
     if (m.google) return doGoogle(m.google);
+    // the profile photo comes only in the message where it changed; keep it even if that message is replaced before drawing
+    if (m.avatar !== undefined && (m.avatar || '') !== avatar) { avatar = m.avatar || ''; fillAvatar(sideAv); last.bar = ''; }
     queued = m;
     if (!post.raf) post.raf = requestAnimationFrame(() => { post.raf = 0; const x = queued; queued = null; if (x) apply(x); });
   }
@@ -119,6 +159,7 @@
 
     // top bar
     const sheetOn = !!(m.form && m.sheet);
+    if (m.page !== lastPage) closeMenu();
     const barKey = JSON.stringify([m.title, m.back, m.page, m.sync, m.syncText, tabsShown(m), m.lang]);
     if (barKey !== last.bar) { last.bar = barKey; renderTop(m); }
     // tab bar
@@ -130,8 +171,8 @@
       b.querySelector('.wdot').hidden = !(page === 'subs' && m.due);
     });
 
-    sideSet.querySelector('.sl').textContent = L('Settings');
-    sideSet.classList.toggle('on', String(m.page || '').indexOf('settings') === 0);
+    sideSet.querySelector('.sl').textContent = L('Profile');
+    sideSet.classList.toggle('on', m.page === 'profile' || String(m.page || '').indexOf('settings') === 0);
     try { renderDesk(m); } catch (e) { rail.textContent = ''; }
     // body
     main.dataset.page = m.page || '';
@@ -188,19 +229,21 @@
     right.appendChild(pill);
     if (!sub) {
       right.appendChild(h('button', { class: 'w-ib', 'aria-label': L('Recent entries'), onclick: () => act('recent') }, svg('clock')));
-      right.appendChild(h('button', { class: 'w-ib', 'aria-label': L('Settings'), onclick: () => act('settings') }, svg('gear')));
+      right.appendChild(avatarBtn());
     }
+    if (m.page === 'goal') right.appendChild(goalMenu());
     const srch = h('label', { class: 'w-dsearch' }, svg('search', false, 18), h('input', { type: 'search', placeholder: L('Quick search records…'), 'aria-label': L('Search'),
       onkeydown: e => { if (e.key === 'Enter' && e.target.value.trim()) { const q = e.target.value.trim(); e.target.value = ''; e.target.blur(); act('recent'); setTimeout(() => send('screen', 'search', q), 60); } } }));
     topBar.append(left, srch, right);
     pageHead.textContent = '';
     if (sub) pageHead.appendChild(h('button', { class: 'w-ib', 'aria-label': L('Back'), onclick: () => act('back') }, svg('back')));
-    pageHead.appendChild(h('div', null, h('div', { class: 'eb', text: eyebrow(m) }), h('h1', { text: m.page === 'entry' ? L('New entry') : (m.title || 'Lemoney') })));
+    pageHead.appendChild(h('div', { class: 'wph-t' }, h('div', { class: 'eb', text: eyebrow(m) }), h('h1', { text: m.page === 'entry' ? L('New entry') : (m.title || 'Lemoney') })));
+    if (m.page === 'goal') pageHead.appendChild(goalMenu());
   }
   function eyebrow(m) {
     const p = String(m.page || '');
     const d = new Date().toLocaleDateString(isTh() ? 'th-TH-u-ca-gregory' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    const k = p === 'entry' ? 'Record a transaction' : p === 'subs' ? 'Recurring commitments' : p === 'debts' ? 'Ledger / people' : p === 'recent' ? 'History' : p.indexOf('settings') === 0 ? 'Preferences' : 'Overview';
+    const k = p === 'entry' ? 'Record a transaction' : p === 'subs' ? 'Recurring commitments' : p === 'debts' ? 'Ledger / people' : p === 'recent' ? 'History' : p.indexOf('settings') === 0 ? 'Preferences' : p === 'profile' ? 'Your account' : p === 'goal' ? 'Savings goal' : 'Overview';
     return L(k) + ' · ' + d;
   }
 
@@ -313,6 +356,30 @@
       const r = new FileReader();
       r.onload = () => { const c = $c(); if (c && c.imported) c.imported(f.name, String(r.result || '')); };
       r.readAsText(f);
+    });
+    document.body.appendChild(inp); inp.click();
+  }
+  /* ---------- pick a photo: square 256 for the profile, 4:3 720×540 for a goal ---------- */
+  function doPhoto(n) {
+    const wide = Number(n) > 1;
+    const W = wide ? 720 : 256, H = wide ? 540 : 256;
+    const inp = h('input', { type: 'file', accept: 'image/*', style: 'position:fixed;left:-999px' });
+    inp.addEventListener('change', () => {
+      const f = inp.files && inp.files[0]; inp.remove();
+      if (!f) return;
+      const url = URL.createObjectURL(f);
+      const img = new Image();
+      img.onload = () => {
+        const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+        const s = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+        const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+        const g = cv.getContext('2d'); g.imageSmoothingQuality = 'high';
+        g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        URL.revokeObjectURL(url);
+        const c = $c(); if (c && c.photo) c.photo(cv.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); showToast(isTh() ? 'เปิดรูปนี้ไม่ได้' : "Couldn't open that image"); };
+      img.src = url;
     });
     document.body.appendChild(inp); inp.click();
   }
@@ -462,9 +529,24 @@
         h('button', { class: 'w-round', disabled: r.next === false, 'aria-label': 'next', onclick: () => send('screen', 'nav', 'next') }, svg('right', false, 20)));
       case 'totals': return h('div', { class: 'w-totals' }, (r.items || []).map(it =>
         h('div', { class: 'wcol' }, h('div', { class: 'l', text: it.l || '' }), h('div', { class: 'v ' + (it.k || ''), text: it.v || '' }))));
+      case 'avatar': {
+        const pic = h('span', { class: 'w-av-big' + (r.photo ? ' has' : '') }, r.photo ? h('img', { src: r.photo, alt: '' }) : svg('person', false, 56));
+        const el = h('div', { class: 'w-avatar' + (r.tap ? ' tap' : '') },
+          h('span', { class: 'w-av-hold' }, pic, r.tap ? h('span', { class: 'w-av-badge' }, svg('camera', false, 17)) : null),
+          h('div', { class: 'nm', text: r.name || '' }), r.sub ? h('div', { class: 'sb', text: r.sub }) : null);
+        if (r.tap) { el.setAttribute('role', 'button'); el.setAttribute('aria-label', L('Change photo')); el.tabIndex = 0; el.addEventListener('click', () => send('screen', 'row', id)); }
+        return el;
+      }
+      case 'photo': {
+        const box = h('div', { class: 'w-photo' + (r.photo ? ' has' : '') }, r.photo ? h('img', { src: r.photo, alt: '' }) : h('div', { class: 'hint' }, svg('photo', false, 36), h('span', { text: r.title || '' })));
+        const el = h('div', { class: 'w-photorow' + (r.tap ? ' tap' : '') }, box);
+        if (r.tap) { el.setAttribute('role', 'button'); el.tabIndex = 0; el.addEventListener('click', () => send('screen', 'row', id)); }
+        return el;
+      }
       case 'bar': {
         const k = r.k || '';
-        return h('div', { class: 'w-bar' },
+        const tapBar = r.tap ? { class: 'w-bar tap', role: 'button', tabindex: '0', onclick: () => send('screen', 'row', id) } : { class: 'w-bar' };
+        return h('div', tapBar,
           h('div', { class: 'wtop' }, h('span', { class: 'n', text: r.title || '' }), h('span', { class: 'v', text: r.value || '' })),
           h('div', { class: 'wtrack' }, h('i', { class: 'k-' + k, style: 'width:' + Math.round(Math.min(1, Math.max(0, r.w || 0)) * 1000) / 10 + '%' })),
           r.note ? h('div', { class: 'note k-' + k, text: r.note }) : null);
@@ -495,7 +577,7 @@
     const inner = [];
     if (ctx.edit && r.del) inner.push(h('button', { class: 'w-minus', 'aria-label': L('Delete'), onclick: ev => { ev.stopPropagation(); send('screen', 'delete', r.del); } }, svg('x', false, 14)));
     if (r.icon) inner.push(h('span', { class: 'ic', text: r.icon }));
-    else if (!ctx.edit && r.value != null && !r.chevron && r.title) {
+    else if (!ctx.edit && r.value != null && !r.chevron && r.title && !r.light) {
       let hs = 0; for (const ch of String(r.title)) hs = (hs * 31 + ch.charCodeAt(0)) % 6;
       inner.push(h('span', { class: 'ic auto', style: '--av:var(--s' + (hs + 1) + ')', text: String(r.title).trim().slice(0, 1).toUpperCase() }));
     }

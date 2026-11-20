@@ -101,7 +101,7 @@ function T(x) {
   if (r !== x) REV[r] = x;
   return r;
 }
-const NO_TR = new Set(['id', 'type', 'vk', 'mode', 'method', 'v', 'page', 'step', 'kind', 'action', 'token', 'style', 'sel', 'theme', 'bg', 'colors', 'accent', 'date', 'from', 'to', 'symbol', 'lang', 'tap', 'del', 'move', 'kbd', 'email', 'url', 'key']);
+const NO_TR = new Set(['id', 'type', 'vk', 'mode', 'method', 'v', 'page', 'step', 'kind', 'action', 'token', 'style', 'sel', 'theme', 'bg', 'colors', 'accent', 'date', 'from', 'to', 'symbol', 'lang', 'tap', 'del', 'move', 'kbd', 'email', 'url', 'key', 'avatar', 'photo']);
 function trDeep(o, k) {
   if (typeof o === 'string') return NO_TR.has(k) ? o : T(o);
   if (Array.isArray(o)) return o.map(x => trDeep(x, k));
@@ -334,6 +334,7 @@ function addEntry() {
   renderEntry();
   toast('✓ Saved ' + baht(amt));
   sync();
+  if (t.type === 'expense') budgetAlert(t);
 }
 
 function queueUpdate(t) {
@@ -551,6 +552,221 @@ function hbRow(name, v, max, cls) {
 function budgets() {
   const b = settings.budgets || {};
   return { total: Number(b.total) || 0, cats: (b.cats && typeof b.cats === 'object') ? b.cats : {} };
+}
+/* ---- budget alert: once per level (80% / 100%) per month, for a category or the total ---- */
+function budgetAlert(t) {
+  const b = budgets(); if (!b.total && !Object.keys(b.cats).length) return;
+  const month = String(t.date || '').slice(0, 7); if (!month) return;
+  const key = t.travel ? TRAVEL : (tn(t.category) || NONE);
+  const spentIn = pick => tx.filter(x => x.type === 'expense' && String(x.date).slice(0, 7) === month && pick(x)).reduce((s, x) => s + x.amount, 0);
+  const items = [];
+  const check = (id, name, budget, spent) => {
+    if (!(budget > 0)) return;
+    const pct = spent / budget, lv = pct >= 1 ? 100 : pct >= 0.8 ? 80 : 0;
+    items.push({ id, name, budget, spent, pct, lv });
+  };
+  check('c:' + key, key, Number(b.cats[key]) || 0, spentIn(x => (x.travel ? TRAVEL : (tn(x.category) || NONE)) === key));
+  check('total', 'Total', b.total, spentIn(() => true));
+  const all = LS.get('budgetAlerts', {});
+  const seen = all[month] || {};
+  const fresh = items.filter(i => i.lv > (seen[i.id] || 0));
+  items.forEach(i => { if (i.lv > (seen[i.id] || 0)) seen[i.id] = i.lv; });
+  if (!fresh.length) return;
+  all[month] = seen;
+  Object.keys(all).sort().slice(0, -4).forEach(k => delete all[k]);   // keep the last few months only
+  LS.set('budgetAlerts', all);
+  const th = curLang() === 'th', hit = fresh.some(i => i.lv === 100);
+  const lines = fresh.map(i => {
+    const nm = th && i.name === 'Total' ? 'งบรวม' : i.name, p = Math.round(i.pct * 100);
+    return th ? `${nm}: ใช้ไป ${p}% (${baht(i.spent)} จาก ${baht(i.budget)})` : `${nm}: ${p}% used (${baht(i.spent)} of ${baht(i.budget)})`;
+  }).join('\n');
+  setTimeout(() => askAlert(hit ? (th ? 'ใช้งบครบแล้ว' : 'Budget reached') : (th ? 'งบใกล้เต็มแล้ว' : 'Budget almost full'), lines, [{ id: 'ok', title: th ? 'ตกลง' : 'OK', style: 'default' }]), 450);
+}
+
+/* ---- savings goals (settings.goals, synced with the settings doc) ---- */
+const goalsList = () => Array.isArray(settings.goals) ? settings.goals : [];
+function saveGoals(arr) {
+  settings = Object.assign({}, settings, { goals: arr });
+  saveSettingsLocal();
+  queue = queue.filter(o => o.op !== 'saveSettings');
+  queue.push({ op: 'saveSettings', settings });
+  saveQueue(); sync();
+}
+function goalInfo(g) {
+  const bal = (balances().find(r => r.key === g.acct) || { bal: 0 }).bal;
+  const target = Number(g.target) || 0, left = Math.max(target - bal, 0);
+  const pct = target ? Math.max(0, Math.min(bal / target, 1)) : 0;
+  let note = Math.round((target ? bal / target : 0) * 100) + '% · ' + baht(left) + ' to go', per = 0, past = false;
+  const done = target > 0 && bal >= target;
+  if (done) note = 'Goal reached';
+  else if (g.date) {
+    const now = new Date(), d = parseYmd(g.date);
+    const months = (d.getFullYear() - now.getFullYear()) * 12 + d.getMonth() - now.getMonth() + (d.getDate() >= now.getDate() ? 1 : 0);
+    past = d < parseYmd(todayStr());
+    if (!past) per = Math.ceil(left / Math.max(months, 1));
+    note += past ? ' · Past target date' : ' · ' + baht(per) + ' / month until ' + F_DM.format(d);
+  }
+  return { bal, target, left, pct, note, done, per, past };
+}
+function goalsModel(colors) {
+  const list = goalsList();
+  const secs = [];
+  if (!list.length) {
+    secs.push({ rows: [{ type: 'empty', text: 'No goals yet' }] });
+    secs.push({ footer: 'Pick an account and a target. Progress follows that account’s balance.', rows: [{ type: 'button', id: 'gadd', title: 'Add a goal', glass: true }] });
+  } else {
+    secs.push({ rows: list.map(g => {
+      const i = goalInfo(g);
+      return { type: 'bar', id: 'g:' + g.id, tap: true, title: g.name || 'Goal', value: baht(i.bal) + ' / ' + baht(i.target), w: i.pct, k: i.done ? 'ok' : 'warn', note: i.note };
+    }) });
+    secs.push({ rows: [{ type: 'button', id: 'gadd', title: 'Add a goal', glass: true }] });
+  }
+  return { page: 'summary-goals', colors, nonce: screenNonce, sections: secs };
+}
+/* ---- one goal's own page ---- */
+const goalById = id => goalsList().find(x => x.id === id);
+function goalName() { const g = goalById(ui.goal); return g ? (g.name || 'Goal') : 'Goal'; }
+function openGoalPage(id) { ui.goal = id; showPage('goal'); }
+function goalPageModel(colors) {
+  const g = goalById(ui.goal);
+  if (!g) return { page: 'goal', colors, sections: [{ rows: [{ type: 'empty', text: 'Nothing here' }] }] };
+  const th = curLang() === 'th', i = goalInfo(g);
+  const secs = [];
+  if (g.photo) secs.push({ rows: [{ type: 'photo', photo: g.photo }] });
+  secs.push({ header: { title: 'Progress' }, rows: [{ type: 'bar', title: i.done ? 'Goal reached' : Math.round(i.pct * 100) + '%', value: baht(i.bal) + ' / ' + baht(i.target), w: i.pct, k: i.done ? 'ok' : 'warn', note: '' }] });
+  const rows = [
+    { type: 'row', title: 'Saved so far', value: baht(i.bal), vk: 'muted', light: true },
+    { type: 'row', title: 'Target', value: baht(i.target), vk: 'muted', light: true },
+    { type: 'row', title: 'Left to go', value: baht(i.left), vk: 'muted', light: true },
+    { type: 'row', title: 'Target date', value: g.date ? F_FULL.format(parseYmd(g.date)) : 'Not set', vk: 'muted', light: true },
+    { type: 'row', title: 'Account', value: g.acct === CASH_KEY ? 'Cash' : g.acct, vk: 'muted', light: true }
+  ];
+  if (g.date && !i.done) rows.push({ type: 'row', title: 'Needed per month', value: i.past ? 'Past target date' : baht(i.per), vk: i.past ? 'neg' : 'muted', light: true });
+  secs.push({ header: { title: 'Details' }, rows });
+  return { page: 'goal', colors, sections: secs };
+}
+/* ---- tax (Thai personal income tax, calendar year). Everything the rules depend on is editable in the page. ---- */
+// progressive brackets: [upper limit of the slice, rate]. Check rd.go.th before relying on them.
+const TAX_BRACKETS = [[150000, 0], [300000, 0.05], [500000, 0.10], [750000, 0.15], [1000000, 0.20], [2000000, 0.25], [5000000, 0.30], [Infinity, 0.35]];
+const taxCfg = () => Object.assign({ status: 'single', map: {}, allowance: '60000', deduct: '', withheld: '', thr1: '', thr2: '' }, settings.tax || {});
+function setTax(p) {
+  settings = Object.assign({}, settings, { tax: Object.assign({}, settings.tax || {}, p) });
+  saveSettingsLocal();
+  queue = queue.filter(o => o.op !== 'saveSettings');
+  queue.push({ op: 'saveSettings', settings });
+  saveQueue(); sync();
+}
+function taxThresholds(c) {
+  const m = c.status === 'married';
+  return { sal: Number(c.thr1) || (m ? 220000 : 120000), oth: Number(c.thr2) || (m ? 120000 : 60000) };
+}
+function taxCalc(year) {
+  const c = taxCfg(), th = taxThresholds(c);
+  let sal = 0, oth = 0;
+  tx.forEach(t => {
+    if (t.type !== 'income' || String(t.date).slice(0, 4) !== String(year)) return;
+    const k = c.map[tn(t.category) || NONE];
+    if (k === 'salary') sal += t.amount; else if (k === 'other') oth += t.amount;
+  });
+  const gross = sal + oth, base = oth > 0 ? th.oth : th.sal;
+  const expense = Math.min(gross * 0.5, 100000);
+  const allowance = Number(c.allowance) || 0, extra = Number(c.deduct) || 0;
+  const net = Math.max(gross - expense - allowance - extra, 0);
+  let tax = 0, prev = 0;
+  TAX_BRACKETS.forEach(([lim, rate]) => { if (net > prev) tax += (Math.min(net, lim) - prev) * rate; prev = lim; });
+  tax = Math.round(tax);
+  return { sal, oth, gross, base, must: gross > base, expense, allowance, extra, net, tax, withheld: Number(c.withheld) || 0 };
+}
+function taxIncomeModel(base) {
+  const c = taxCfg(), cats = settings.income.map(x => parseItem(x).name), secs = [];
+  secs.push({ footer: 'Not taxable: money that is not income from work, such as family support or a scholarship. Salary: pay from an employer. Other work: freelance, side jobs, selling.', rows: [{ type: 'note', text: cats.length ? 'Pick one for each category' : 'No income categories yet. Add some in Settings → Income categories.' }] });
+  cats.forEach(n => secs.push({ header: { title: n }, rows: [{ type: 'seg', id: 'taxm:' + n, plain: true, sel: c.map[n] || 'none', items: segItems([['none', 'Not taxable'], ['salary', 'Salary'], ['other', 'Other work']]) }] }));
+  return Object.assign({ page: 'settings:taxinc', sections: secs }, base);
+}
+function taxModel(base) {
+  const c = taxCfg(), th = taxThresholds(c), year = new Date().getFullYear(), r = taxCalc(year), thai = curLang() === 'th';
+  const secs = [];
+  const mapped = Object.keys(c.map).some(k => c.map[k] !== 'none');
+  secs.push({ header: { title: 'Tax year ' + year }, footer: 'An estimate to help you plan, not tax advice. Rules and rates can change: check rd.go.th, and edit the numbers below if they differ.',
+    rows: [{ type: 'bar', title: r.must ? 'You need to file' : 'Not required to file yet', value: baht(r.gross) + ' / ' + baht(r.base), w: r.base ? Math.min(r.gross / r.base, 1) : 0,
+      k: r.must ? 'over' : r.gross / r.base >= 0.8 ? 'warn' : 'ok', note: mapped ? (r.must ? 'Your income passed the filing line' : baht(Math.max(r.base - r.gross, 0)) + ' to go before you must file') : 'Pick which income counts below' }] });
+  const cats = settings.income.map(x => parseItem(x).name);
+  const nCounted = cats.filter(n => (c.map[n] || 'none') !== 'none').length;
+  secs.push({ header: { title: 'Status' }, rows: [{ type: 'seg', id: 'taxst', plain: true, sel: c.status, items: segItems([['single', 'Single'], ['married', 'Married']]) }] });
+  secs.push({ header: { title: 'Which income counts' }, footer: cats.length ? 'Set each income category to Not taxable, Salary or Other work. Money from family or a scholarship is usually not taxable.' : 'Add income categories in Settings first.',
+    rows: [{ type: 'row', id: 'sub:taxinc', tap: true, title: 'Income categories', value: cats.length ? nCounted + ' / ' + cats.length : '', vk: 'muted', chevron: 'right', light: true }] });
+  secs.push({ header: { title: 'Counted this year' }, rows: [
+    { type: 'row', title: 'Salary', value: baht(r.sal), vk: 'muted', light: true },
+    { type: 'row', title: 'Other work', value: baht(r.oth), vk: 'muted', light: true }] });
+  secs.push({ header: { title: 'Your numbers' }, footer: 'Leave a filing line empty to use the default for your status (salary ' + baht(th.sal) + ', other ' + baht(th.oth) + ').', rows: [
+    { type: 'field', id: 'tx:thr1', lazy: true, title: 'Filing line · salary only', kbd: 'decimal', placeholder: String(th.sal), value: String(c.thr1 || '') },
+    { type: 'field', id: 'tx:thr2', lazy: true, title: 'Filing line · other income', kbd: 'decimal', placeholder: String(th.oth), value: String(c.thr2 || '') },
+    { type: 'field', id: 'tx:allowance', lazy: true, title: 'Personal allowance', kbd: 'decimal', placeholder: '60000', value: String(c.allowance) },
+    { type: 'field', id: 'tx:deduct', lazy: true, title: 'Other deductions', kbd: 'decimal', placeholder: '0', value: String(c.deduct || '') },
+    { type: 'field', id: 'tx:withheld', lazy: true, title: 'Tax already withheld', kbd: 'decimal', placeholder: '0', value: String(c.withheld || '') }] });
+  if (r.gross > 0) {
+    const left = r.tax - r.withheld;
+    secs.push({ header: { title: 'Estimated tax' }, footer: 'Expenses are taken as 50% of income, up to ฿100,000. The rest uses the standard progressive rates (0% up to ฿150,000, then 5%–35%).', rows: [
+      { type: 'row', title: 'Income', value: baht(r.gross), vk: 'muted', light: true },
+      { type: 'row', title: 'Expenses', value: '− ' + baht(r.expense), vk: 'muted', light: true },
+      { type: 'row', title: 'Allowance & deductions', value: '− ' + baht(r.allowance + r.extra), vk: 'muted', light: true },
+      { type: 'row', title: 'Taxable income', value: baht(r.net), vk: 'muted', light: true },
+      { type: 'row', title: 'Tax', value: baht(r.tax), vk: r.tax ? 'neg' : 'muted' },
+      { type: 'row', title: left > 0 ? 'Still to pay' : left < 0 ? 'Refund' : 'Balance', value: baht(Math.abs(left)), vk: 'muted', light: true }] });
+  }
+  return Object.assign({ page: 'settings:tax', sections: secs }, base);
+}
+let gf = null;
+function openGoalForm(id) {
+  const g = goalsList().find(x => x.id === id);
+  const first = accountNames()[0] || CASH_KEY;
+  gf = g ? { id, name: g.name || '', target: String(g.target || ''), date: g.date || '', acct: g.acct || first, photo: g.photo || '' }
+         : { id: '', name: '', target: '', date: '', acct: first, photo: '' };
+  formSession++; pushChrome();
+}
+function goalForm() {
+  const names = accountNames();
+  const accItems = names.map(n => ({ v: n, n })).concat([{ v: CASH_KEY, n: 'Cash' }]);
+  if (gf.acct && gf.acct !== CASH_KEY && !names.includes(gf.acct)) accItems.unshift({ v: gf.acct, n: gf.acct });
+  const secs = [
+    { rows: [{ type: 'photo', id: 'gpick', tap: true, photo: gf.photo, title: 'Add a photo' }] },
+    { header: { title: 'Goal name' }, rows: [{ type: 'field', id: 'gname', kbd: 'text', value: gf.name, placeholder: 'e.g. New laptop' }] },
+    { header: { title: 'Target amount' }, rows: [{ type: 'field', id: 'gamt', big: true, kbd: 'decimal', value: gf.target, placeholder: '0.00' }] },
+    { header: { title: 'Saved in' }, footer: 'Progress is this account’s current balance.', rows: [{ type: 'chips', id: 'gacc', sel: gf.acct, items: chipItems(accItems) }] },
+    { rows: [{ type: 'switch', id: 'gdon', title: 'Target date', on: !!gf.date }].concat(gf.date ? [{ type: 'date', id: 'gdate', title: 'Reach it by', value: gf.date }] : []) }
+  ];
+  if (gf.photo) secs.push({ rows: [{ type: 'button', id: 'grm', title: 'Remove photo', glass: true }] });
+  if (gf.id) secs.push({ rows: [{ type: 'button', id: 'gdel', title: 'Delete this goal', style: 'danger', glass: true }] });
+  return { page: 'form-goal-' + formSession, colors: formColors('trv'), nonce: screenNonce, sections: secs };
+}
+const gfComplete = () => !!gf && gf.name.trim().length > 0 && parseAmount(gf.target) > 0;
+function gfAction(kind, v) {
+  const o = (v && typeof v === 'object') ? v : {};
+  if (kind === 'field') {
+    if (o.id === 'gname') gf.name = String(o.v); else if (o.id === 'gamt') gf.target = numOnly(String(o.v)); else if (o.id === 'gdate') gf.date = String(o.v);
+  } else if (kind === 'chip') { if (o.id === 'gacc') gf.acct = String(o.v); }
+  else if (kind === 'toggle') { if (o.id === 'gdon') { gf.date = o.on ? (gf.date || ymd(addDays(new Date(), 90))) : ''; formSession++; } }
+  else if (kind === 'row') { if (v === 'gpick') { const hh = chromeH(); if (hh) hh.postMessage({ photo: 720 }); } }
+  else if (kind === 'button') { if (v === 'gdel') deleteGoal(gf.id); else if (v === 'grm') { gf.photo = ''; formSession++; } }
+}
+function saveGoalForm() {
+  if (!gfComplete()) { gf = null; pushChrome(); return; }
+  const g = { id: gf.id || uid(), name: gf.name.trim(), target: parseAmount(gf.target), date: gf.date || '', acct: gf.acct, photo: gf.photo || '' };
+  saveGoals(gf.id ? goalsList().map(x => x.id === g.id ? g : x) : goalsList().concat([g]));
+  gf = null; render(); toast('Saved');
+}
+async function deleteGoal(id) {
+  const r = await askAlert('Delete this goal?', 'Your account balance is not affected.', [{ id: 'del', title: 'Delete', style: 'destructive' }, { id: 'no', title: 'Cancel', style: 'cancel' }]);
+  if (r !== 'del') return;
+  saveGoals(goalsList().filter(x => x.id !== id)); gf = null;
+  if (ui.page === 'goal') showPage(ui.backTo || 'summary'); else render();
+  toast('Deleted');
+}
+async function goalSheetAction() {
+  if (gfComplete()) {
+    const r = await askAlert('Save this goal?', '', [{ id: 'ok', title: 'Save', style: 'default' }, { id: 'discard', title: 'Discard', style: 'destructive' }, { id: 'keep', title: 'Keep editing', style: 'cancel' }]);
+    if (r === 'ok') saveGoalForm(); else if (r === 'discard') { gf = null; pushChrome(); }
+  } else { gf = null; pushChrome(); }
 }
 function progHTML(name, spent, budget) {
   const pct = budget ? spent / budget : 0;
@@ -1460,6 +1676,7 @@ async function editAction() {
   }
 }
 function sheetAction() {
+  if (gf) { goalSheetAction(); return; }
   if (ie || df) { debtSheetAction(); return; }
   if (sb && !$('#subSheet').hidden) subAction();
   else if (ed && !$('#editSheet').hidden) editAction();
@@ -1493,7 +1710,8 @@ function openSettings(toConnect) {
   $('#testMsg').textContent = ''; $('#testMsg').className = 'hint';
   fillLists(settings);
   markSettingsSegs();
-  ui.settingsSub = toConnect === true ? 'connect' : '';   // the iPhone app shows Connect as its own page
+  ui.settingsSub = toConnect === true ? 'connect' : (typeof toConnect === 'string' && SET_SUBS[toConnect]) ? toConnect : '';   // the iPhone app shows Connect as its own page
+  ui.directSub = typeof toConnect === 'string' && !!ui.settingsSub;   // opened straight onto a sub-page (e.g. Profile → Tax): back returns to where it came from
   showPage('settings');
   if (toConnect === true) setTimeout(() => $('#connectSec').scrollIntoView({ block: 'start' }), 0);
 }
@@ -1551,12 +1769,62 @@ function saveSettingsForm() {
 
 /* ---------- native bars bridge (iPhone app only) ---------- */
 function sheetInfo() {
+  if (gf) return { title: gf.id ? 'Edit goal' : 'New goal', action: gfComplete() ? 'confirm' : 'close' };
   if (ie) return { title: 'Edit item', action: ieComplete() ? 'confirm' : 'close' };
   if (df) return { title: dfTitle(), action: dfComplete() ? 'confirm' : 'close' };
   if (!$('#subSheet').hidden && sb) return { title: $('#subTitle').textContent, action: subComplete() ? 'confirm' : 'close' };
   if (!$('#editSheet').hidden && ed) return { title: $('#editTitle').textContent, action: editComplete() ? 'confirm' : 'close' };
   return null;
 }
+let avatarSent = null;
+// the profile photo goes to the native bar only when it changed (it is a long text)
+function avatarOut() { const a = (settings.profile && settings.profile.photo) || ''; if (a === avatarSent) return undefined; avatarSent = a; return a; }
+function setProfile(p) {
+  settings = Object.assign({}, settings, { profile: Object.assign({}, settings.profile || {}, p) });
+  saveSettingsLocal();
+  queue = queue.filter(o => o.op !== 'saveSettings');
+  queue.push({ op: 'saveSettings', settings });
+  saveQueue();
+  sync();
+}
+function profileName() {
+  const n = String((settings.profile && settings.profile.name) || '').trim();
+  return n || (fbUser && (fbUser.displayName || String(fbUser.email || '').split('@')[0])) || '';
+}
+function deployLeft() {
+  const e = Number(window.__expiry) || 0;
+  if (!e) return null;
+  const ms = e - Date.now();
+  if (ms <= 0) return { text: curLang() === 'th' ? 'หมดอายุแล้ว' : 'Expired', bad: true, end: e };
+  const m = Math.floor(ms / 60000), d = Math.floor(m / 1440), hh = Math.floor((m % 1440) / 60), mm = m % 60;
+  const th = curLang() === 'th';
+  return { text: th ? `${d} วัน ${hh} ชม. ${mm} นาที` : `${d}d ${hh}h ${mm}m`, bad: ms < 86400000, end: e };
+}
+function profileModel(colors) {
+  const th = curLang() === 'th', loc = th ? 'th-TH-u-ca-gregory' : 'en-GB';
+  const pr = settings.profile || {};
+  const secs = [];
+  secs.push({ rows: [{ type: 'avatar', id: 'photo', tap: true, photo: pr.photo || '', name: profileName() || (th ? 'ชื่อของคุณ' : 'Your name'), sub: fbUser ? fbUser.email : '' }] });
+  secs.push({ header: { title: 'Name' }, rows: [{ type: 'field', id: 'pname', lazy: true, title: '', placeholder: 'Your name', value: String(pr.name || '') }] });
+  if (pr.photo) secs.push({ rows: [{ type: 'button', id: 'rmphoto', title: 'Remove photo', style: 'danger' }] });
+  const dates = tx.map(t => t.date).filter(Boolean).sort();
+  const rows = [];
+  if (dates.length) {
+    const first = dates[0], days = Math.max(1, Math.round((todayDate() - parseYmd(first)) / 86400000) + 1);
+    rows.push({ type: 'row', title: 'First entry', value: parseYmd(first).toLocaleDateString(loc, { day: 'numeric', month: 'long', year: 'numeric' }), vk: 'muted', light: true });
+    rows.push({ type: 'row', title: 'Tracking for', value: th ? days + ' วัน' : days + (days === 1 ? ' day' : ' days'), vk: 'muted', light: true });
+    rows.push({ type: 'row', title: 'Entries', value: String(tx.length), vk: 'muted', light: true });
+  } else rows.push({ type: 'row', title: 'First entry', value: th ? 'ยังไม่มี' : 'None yet', vk: 'muted', light: true });
+  secs.push({ header: { title: 'Your journey' }, rows });
+  const dl = deployLeft();
+  if (dl) secs.push({ header: { title: 'iPhone app' }, footer: 'The app stops opening when this reaches zero. Connect your iPhone to your Mac and run it from Xcode again before then.',
+    rows: [{ type: 'row', title: 'Next deploy from Mac in', value: dl.text, vk: dl.bad ? 'neg' : 'muted' },
+      { type: 'row', title: 'Expires on', value: new Date(dl.end).toLocaleString(loc, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), vk: 'muted', light: true }] });
+  if (window.__build) secs.push({ rows: [{ type: 'row', title: 'App build', value: String(window.__build), vk: 'muted', light: true }] });
+  secs.push({ rows: [{ type: 'row', id: 'tax', tap: true, title: 'Tax', value: '', vk: 'muted', chevron: 'right', light: true }, { type: 'row', id: 'settings', tap: true, title: 'Settings', value: '', vk: 'muted', chevron: 'right', light: true }] });
+  return { page: 'profile', colors, sections: secs };
+}
+setInterval(() => { if (ui.page === 'profile' && !document.hidden) pushChrome(); }, 15000);
 function pushChrome() {
   if (!NATIVE) return;
   try {
@@ -1576,7 +1844,7 @@ function pushChrome() {
         auth: authGate() ? { step: acct.step, msg: acct.msg, bad: acct.bad, busy: acct.busy, email: acct.email } : null,
         modal: !!document.querySelector('.sheet:not([hidden]):not(#subSheet):not(#editSheet)'),
         sheet,
-        sync: chromeSync.state, syncText: chromeSync.text, theme: cfg.theme, bg
+        sync: chromeSync.state, syncText: chromeSync.text, theme: cfg.theme, bg, avatar: avatarOut()
       }));
     }
   } catch (e) { /* ignore */ }
@@ -1766,8 +2034,8 @@ function summaryModel(colors) {
 const SETTINGS_LISTS = [['accounts', 'Accounts'], ['expense', 'Expense categories'], ['income', 'Income categories'], ['travel', 'Travel types'], ['people', 'People']];
 // pages inside Settings (iPhone app): [full name, short title shown in the top bar]
 const SET_SUBS = { open: ['Starting balances', 'Start balances'], accounts: ['Accounts', 'Accounts'], expense: ['Expense categories', 'Expenses'],
-  income: ['Income categories', 'Income'], travel: ['Travel types', 'Travel'], people: ['People', 'People'], connect: ['Google Sheet (old)', 'Google Sheet'], account: ['Account', 'Account'], backup: ['Backup & restore', 'Backup'] };
-const settingsTitle = () => (ui.page === 'settings' && ui.settingsSub) ? SET_SUBS[ui.settingsSub][1] : (ui.page === 'summary' && ui.sumView === 'balance') ? 'Balance' : (ui.page === 'person') ? personName() : TITLES[ui.page];
+  income: ['Income categories', 'Income'], travel: ['Travel types', 'Travel'], people: ['People', 'People'], connect: ['Google Sheet (old)', 'Google Sheet'], account: ['Account', 'Account'], backup: ['Backup & restore', 'Backup'], tax: ['Tax', 'Tax'], taxinc: ['Income categories', 'Income'] };
+const settingsTitle = () => (ui.page === 'settings' && ui.settingsSub) ? SET_SUBS[ui.settingsSub][1] : (ui.page === 'summary' && ui.sumView === 'balance') ? 'Balance' : (ui.page === 'summary' && ui.sumView === 'goals') ? 'Goals' : (ui.page === 'person') ? personName() : (ui.page === 'goal') ? goalName() : TITLES[ui.page];
 function settingsModel(colors) {
   const secs = [];
   const sub = ui.settingsSub;
@@ -1787,7 +2055,7 @@ function settingsModel(colors) {
     const nav = (key, value) => ({ type: 'row', id: 'sub:' + key, tap: true, title: SET_SUBS[key][0], value, vk: 'muted', chevron: 'right', light: true });
     const nOpen = Object.keys(openingMap()).filter(k => Number(openingMap()[k])).length;
     secs.push({ header: { title: 'Your data' }, rows: [nav('open', nOpen ? String(nOpen) : '')].concat(SETTINGS_LISTS.map(([key]) => nav(key, String((draft[key] || []).length)))) });
-    secs.push({ rows: [nav('backup', '')] });
+    secs.push({ rows: [nav('tax', ''), nav('backup', '')] });
     if (!fbUser) secs.push({ rows: [nav('connect', cfg.url ? 'Connected' : 'Not set')] });
     return Object.assign({ page: 'settings', sections: secs }, base);
   }
@@ -1802,6 +2070,8 @@ function settingsModel(colors) {
   }
   if (sub === 'account') return accountModel(base);
   if (sub === 'backup') return backupModel(base);
+  if (sub === 'tax') return taxModel(base);
+  if (sub === 'taxinc') return taxIncomeModel(base);
   if (sub === 'connect') {
     const msg = $('#testMsg').textContent;
     const rows = [
@@ -2254,6 +2524,8 @@ function screenModel() {
   if (ui.page === 'balance') return { page: 'balance', colors, sections: balanceSections() };
   if (ui.page === 'debts') return debtsModel(colors);
   if (ui.page === 'person') return personModel(colors);
+  if (ui.page === 'profile') return profileModel(colors);
+  if (ui.page === 'goal') return goalPageModel(colors);
   if (ui.page === 'subs') {
     const list = sortedSubs();
     const monthly = list.reduce((s, x) => s + (isCard(x) ? x.plan[0] : (x.cycle === 'year' ? x.amount / 12 : x.amount)), 0);
@@ -2290,8 +2562,8 @@ function screenModel() {
     return { page: 'recent', colors, search: ui.q, sections: secs };
   }
   if (ui.page === 'summary') {
-    const m = ui.sumView === 'balance' ? { page: 'summary-balance', colors, nonce: screenNonce, sections: balanceSections() } : summaryModel(colors);
-    m.sections.unshift({ rows: [{ type: 'seg', id: 'sumview', plain: true, sel: ui.sumView, items: segItems([['balance', 'Balance'], ['summary', 'Summary']]) }] });
+    const m = ui.sumView === 'balance' ? { page: 'summary-balance', colors, nonce: screenNonce, sections: balanceSections() } : ui.sumView === 'goals' ? goalsModel(colors) : summaryModel(colors);
+    m.sections.unshift({ rows: [{ type: 'seg', id: 'sumview', plain: true, sel: ui.sumView, items: segItems([['balance', 'Balance'], ['summary', 'Summary'], ['goals', 'Goals']]) }] });
     return m;
   }
   if (ui.page === 'settings') return settingsModel(colors);
@@ -2303,6 +2575,7 @@ let formSession = 0;
 function formColors(accentKey) { const c = entryColors(); return Object.assign({}, c, { accent: c[accentKey] || c.trv }); }
 function editComplete() { return !!ed && parseAmount(ed.amount) > 0; }
 function formModel() {
+  if (gf) return goalForm();
   if (ie) return itemForm();
   if (df) return debtForm();
   if (!$('#subSheet').hidden && sb) return subForm();
@@ -2362,6 +2635,7 @@ function subForm() {
 }
 
 function formAction(kind, v) {
+  if (gf) { gfAction(kind, v); pushChrome(); return; }
   if (ie) { ieAction(kind, v); pushChrome(); return; }
   if (df) { dfAction(kind, v); pushChrome(); return; }
   const o = (v && typeof v === 'object') ? v : {};
@@ -2413,20 +2687,32 @@ function addDraftItem(key, raw) {
 }
 
 function screenAction(kind, v) {
-  if (ie || df || (sb && !$('#subSheet').hidden) || (ed && !$('#editSheet').hidden)) { formAction(kind, v); return; }
+  if (gf || ie || df || (sb && !$('#subSheet').hidden) || (ed && !$('#editSheet').hidden)) { formAction(kind, v); return; }
   const o = (v && typeof v === 'object') ? v : {};
   if (kind === 'row') {
     if (ui.page === 'subs') showSubDetail(v);
     else if (ui.page === 'recent') openEdit(v);
+    else if (ui.page === 'summary' && ui.sumView === 'goals') { if (String(v).indexOf('g:') === 0) openGoalPage(String(v).slice(2)); }
     else if (ui.page === 'summary') { if (ui.sumView === 'balance') showBalanceDetail(v); else if (v === 'detail') $('#detailToggle').click(); else openEdit(v); }
     else if (ui.page === 'debts') { if (String(v).startsWith('p:')) openPersonPage(String(v).slice(2)); else if (String(v).startsWith('i:')) showItemDetail(String(v).slice(2)); }
     else if (ui.page === 'person') showItemDetail(String(v));
+    else if (ui.page === 'profile') {
+      if (v === 'photo') { const hh = chromeH(); if (hh) hh.postMessage({ photo: 1 }); }
+      else if (v === 'settings') { ui.viaProfile = true; $('#settingsBtn').click(); }
+      else if (v === 'tax') { ui.viaProfile = true; openSettings('tax'); }
+    }
     else if (ui.page === 'balance') showBalanceDetail(v);
     else if (ui.page === 'settings' && String(v).startsWith('sub:')) { ui.settingsSub = String(v).slice(4); if (!SET_SUBS[ui.settingsSub]) ui.settingsSub = ''; }
   }
   else if (kind === 'button') {
-    if (ui.page === 'subs') payNow(v);
+    if (ui.page === 'summary' && ui.sumView === 'goals') { if (v === 'gadd') openGoalForm(''); }
+    else if (ui.page === 'goal') {
+      if (v === 'gedit') openGoalForm(ui.goal);
+      else if (v === 'gdelp') deleteGoal(ui.goal);
+    }
+    else if (ui.page === 'subs') payNow(v);
     else if (ui.page === 'recent') { if (v === 'more') { ui.recentN += 50; renderRecent(); } }
+    else if (ui.page === 'profile') { if (v === 'rmphoto') setProfile({ photo: '' }); }
     else if (ui.page === 'person') { if (v === 'paidall') { const p = peopleStat().find(x => x.key === ui.person); if (p) openPayForm(p.entries.filter(e => !e.paid && isItem(e)).map(e => e.id)); } }
     else if (ui.page === 'settings') {
       const fm = String(v).match(/^fav:(\w+):(\d+)$/);
@@ -2459,11 +2745,13 @@ function screenAction(kind, v) {
   else if (kind === 'seg') {
     if (o.id === 'amode') { acct.mode = o.v === 'up' ? 'up' : 'in'; acct.msg = ''; }
     else if (o.id === 'dview') { ui.debtView = o.v === 'item' ? 'item' : 'person'; render(); }
-    else if (o.id === 'sumview') { ui.sumView = o.v === 'balance' ? 'balance' : 'summary'; ui.budEdit = false; render(); }
+    else if (o.id === 'sumview') { ui.sumView = o.v === 'balance' ? 'balance' : o.v === 'goals' ? 'goals' : 'summary'; ui.budEdit = false; render(); }
     else if (o.id === 'range') { ui.range = o.v; ui.budEdit = false; renderSummary(); }
     else if (o.id === 'lang') { cfg.lang = o.v; saveCfg(); document.documentElement.lang = curLang(); screenNonce++; markSettingsSegs(); render(); }
     else if (o.id === 'theme') { cfg.theme = o.v; saveCfg(); applyTheme(); markSettingsSegs(); }
     else if (o.id === 'week') { cfg.weekStart = Number(o.v); saveCfg(); markSettingsSegs(); }
+    else if (o.id === 'taxst') { setTax({ status: o.v === 'married' ? 'married' : 'single' }); render(); }
+    else if (String(o.id).startsWith('taxm:')) { const c = taxCfg(); setTax({ map: Object.assign({}, c.map, { [String(o.id).slice(5)]: o.v }) }); render(); }
   }
   else if (kind === 'nav') {
     if (v === 'prev') shiftAnchor(-1); else if (v === 'next') shiftAnchor(1); else ui.anchor = new Date();
@@ -2475,6 +2763,8 @@ function screenAction(kind, v) {
     else if (id.startsWith('open:')) { const k = id.slice(5); openDraft[k] = numOnly(val); setDomInput('#openList input[data-open]', 'open', k, openDraft[k]); }
     else if (id === 'em') acct.email = val;
     else if (id === 'pw') acct.pass = val;
+    else if (id === 'pname') setProfile({ name: val.trim() });
+    else if (id.startsWith('tx:')) { setTax({ [id.slice(3)]: val.replace(/[^\d.]/g, '') }); render(); }
     else if (id === 'url') $('#cfgUrl').value = val;
     else if (id === 'key') $('#cfgKey').value = val;
   }
@@ -2518,10 +2808,15 @@ window.__chrome = {
     else if (name === 'back') goBack();
     else if (name === 'settings') $('#settingsBtn').click();
     else if (name === 'sheet') sheetAction();
+    else if (name === 'goal-edit') { if (ui.page === 'goal') openGoalForm(ui.goal); }
+    else if (name === 'goal-delete') { if (ui.page === 'goal') deleteGoal(ui.goal); }
     else if (name === 'sync') $('#syncBtn').click();
     else if (name === 'unlock') unlock();
     else if (TITLES[name] && name !== 'recent') showPage(name);
   },
+  photo(dataUrl) {
+    if (gf && /^data:image\//.test(String(dataUrl))) { gf.photo = String(dataUrl); pushChrome(); return; }
+    if (/^data:image\//.test(String(dataUrl))) { setProfile({ photo: String(dataUrl) }); toast('✓ Photo updated'); pushChrome(); } },
   imported(name, text) { importData(name, text); },
   googleResult(token, err) { googleResult(token, err); },
   auth(kind, v) {
@@ -2531,14 +2826,15 @@ window.__chrome = {
     else if (kind === 'google') acctGoogle();
     else if (kind === 'forgot') { acct.email = String(o.email || acct.email); acctForgot(); }
   },
-  ready() { pushChrome(); }
+  ready() { avatarSent = null; pushChrome(); }
 };
 
 /* ================= navigation / render ================= */
-const TITLES = { entry: 'Lemoney', subs: 'Subs', recent: 'Recent', summary: 'Summary', balance: 'Balance', debts: 'Debts', person: 'Person', settings: 'Settings' };
-const SUBPAGE = { recent: 1, settings: 1, person: 1 };   // full pages without the tab bar, with a back chevron
+const TITLES = { entry: 'Lemoney', subs: 'Subs', recent: 'Recent', summary: 'Summary', balance: 'Balance', debts: 'Debts', person: 'Person', settings: 'Settings', profile: 'Profile', goal: 'Goal' };
+const SUBPAGE = { recent: 1, settings: 1, person: 1, profile: 1, goal: 1 };   // full pages without the tab bar, with a back chevron
 function showPage(name) {
   const prevPage = ui.page;
+  if (name !== 'settings' && name !== 'profile') ui.viaProfile = false;
   if (SUBPAGE[name] && !SUBPAGE[ui.page]) ui.backTo = ui.page || 'entry';
   ui.page = name;
   document.body.classList.toggle('on-recent', name === 'recent');
@@ -2570,6 +2866,7 @@ function render() {
   else if (ui.page === 'subs') renderSubs();
   else if (ui.page === 'balance') renderBalance();
   else if (ui.page === 'debts') renderDebtsWeb();
+  else if (ui.page === 'goal') { if (!goalById(ui.goal)) { showPage('summary'); return; } }
   else if (ui.page === 'person') { if (!peopleStat().some(x => x.key === ui.person)) { showPage('debts'); return; } }
   else if (ui.page === 'settings') { /* static form, filled by openSettings */ }
   else renderSummary();
@@ -2662,9 +2959,11 @@ $('#listEditors').addEventListener('click', e => {
 });
 const goBack = () => {
   if (ui.page === 'settings' && !ui.leaving) {
-    if (ui.settingsSub) { ui.settingsSub = ''; render(); return; }   // back from a Settings sub-page
+    if (ui.settingsSub === 'tax' && ui.directSub) { ui.directSub = false; ui.settingsSub = ''; ui.leaving = true; try { goBack(); } finally { ui.leaving = false; } return; }
+    if (ui.settingsSub) { ui.settingsSub = ui.settingsSub === 'taxinc' ? 'tax' : ''; render(); return; }   // back from a Settings sub-page
     saveSettingsForm(); return;   // going back from Settings = save
   }
+  if (ui.page === 'settings' && ui.viaProfile) { ui.viaProfile = false; showPage('profile'); return; }
   showPage(ui.backTo && !SUBPAGE[ui.backTo] ? ui.backTo : 'entry');
 };
 $('#recentBtn').addEventListener('click', () => ui.page === 'recent' ? goBack() : showPage('recent'));

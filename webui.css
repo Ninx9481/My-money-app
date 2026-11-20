@@ -343,3 +343,48 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
   .w-auth-box.welcome .wc { flex: none; }
   .w-auth-box:not(.welcome) { background: var(--card); box-shadow: 0 0 0 1px var(--line); border-radius: 24px; min-height: 0; margin: 6vh auto; padding: 32px; }
 }
+
+/* ---- v72: Profile, Goals, Tax (same screens as the iPhone app build 71) ---- */
+/* avatar button (top bar) and sidebar profile entry */
+.w-avbtn { overflow: hidden; padding: 0; color: var(--muted); }
+.w-avbtn.has { box-shadow: 0 0 0 1px var(--line); }
+.w-avbtn img, .w-av-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.w-av-mini { width: 26px; height: 26px; border-radius: 50%; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; background: var(--chip); color: var(--muted); flex: none; margin: -3px -2px; }
+/* profile header */
+.w-avatar { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 24px 16px 22px; background: var(--card); text-align: center; }
+.w-avatar.tap { cursor: pointer; }
+.w-av-hold { position: relative; width: 112px; height: 112px; margin-bottom: 8px; }
+.w-av-big { width: 112px; height: 112px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--chip); color: var(--muted); }
+.w-av-big img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.w-av-badge { position: absolute; right: 2px; bottom: 2px; width: 34px; height: 34px; border-radius: 50%; background: var(--trv); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--card); }
+.w-avatar .nm { font-size: 22px; font-weight: 700; letter-spacing: -.3px; overflow-wrap: anywhere; }
+.w-avatar .sb { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+/* goal photo (4:3) */
+.w-photorow { padding: 12px 14px; background: var(--card); }
+.w-photorow.tap { cursor: pointer; }
+.w-photo { width: 100%; aspect-ratio: 4 / 3; border-radius: 16px; overflow: hidden; background: var(--chip); display: flex; align-items: center; justify-content: center; }
+.w-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.w-photo .hint { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--muted); font-size: 15px; font-weight: 600; }
+.w-photorow.tap:hover .w-photo:not(.has) { background: color-mix(in srgb, var(--chip) 88%, var(--text) 6%); }
+/* tappable goal bars */
+.w-bar.tap { cursor: pointer; }
+.w-bar.tap:active, .w-avatar.tap:active { background: color-mix(in srgb, var(--card) 88%, var(--text) 6%); }
+/* ⋯ menu */
+.w-more { color: var(--text); }
+.w-menu-wrap { position: absolute; inset: 0; z-index: 60; }
+.w-menu { position: absolute; min-width: 210px; background: var(--card); border-radius: 14px; padding: 6px; box-shadow: 0 0 0 1px var(--line), 0 12px 36px rgba(0,0,0,.18); display: flex; flex-direction: column; animation: wmenu .14s ease-out; transform-origin: top right; }
+.w-menu button { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 12px; border-radius: 9px; font-size: 16px; text-align: left; color: var(--text); }
+.w-menu button:hover, .w-menu button:focus-visible { background: var(--chip); outline: none; }
+.w-menu button.bad { color: var(--exp); }
+@keyframes wmenu { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+
+@media (min-width: 900px) {
+  .w-ph .w-ib { display: inline-flex; flex: none; }
+  .w-ph .wph-t { flex: 1; min-width: 0; }
+  .w-ph .w-ib.w-more { margin-left: auto; }
+  .w-list > .w-sec .w-group > .w-avatar, .w-list > .w-sec .w-group > .w-photorow { background: transparent; }
+  .w-photorow { padding: 0; }
+  .w-list > .w-sec:has(.w-photo) { max-width: 560px; }
+  .w-bar.tap:hover { background: color-mix(in srgb, var(--bg) 90%, var(--text) 6%) !important; }
+}
+.w-btnrow.glass, .w-group.bare > .w-btnrow.glass { background: transparent; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 4px 0; }   /* style.css also has a .glass class */
