@@ -129,6 +129,80 @@
   tabBar.append(h('span', { class: 'w-grow' }), sideSet);
 
   let last = {}, lastPage = '', queued = null;
+
+  /* ---------- page transitions: push slides in from the right, pop slides back; tabs just fade ---------- */
+  const reduceMotion = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const wide = () => !!(window.matchMedia && matchMedia('(min-width: 900px)').matches);
+  const depthOf = p => { p = String(p || ''); if (p === 'settings') return 2; if (p === 'settings:taxinc') return 4; if (p.indexOf('settings') === 0) return 3; return ({ recent: 1, person: 1, profile: 1, goal: 1 })[p] || 0; };
+  const EASE = 'cubic-bezier(.32,.72,0,1)';
+  let skipNext = false;
+  // copy what is on screen now, so it can slide away while the new page is drawn underneath
+  function snapOld(from, to) {
+    if (skipNext) { skipNext = false; return null; }
+    if (!from || reduceMotion() || !main.firstChild) return null;
+    const dir = Math.sign(depthOf(to) - depthOf(from));
+    const r = main.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    const snap = h('div', { class: 'w-snap', style: 'left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px' });
+    const inner = h('div', { class: 'w-snap-in', style: 'padding:' + getComputedStyle(main).padding + ';transform:translateY(' + (-main.scrollTop) + 'px)' });
+    Array.from(main.childNodes).forEach(n => inner.appendChild(n.cloneNode(true)));
+    snap.appendChild(inner);
+    return { snap, dir };
+  }
+  function runTrans(t) {
+    if (!t || !main.animate) return;
+    const { snap, dir } = t;
+    root.appendChild(snap);
+    const done = () => { snap.remove(); main.style.position = ''; main.style.zIndex = ''; main.style.background = ''; main.style.boxShadow = ''; };
+    const opt = ms => ({ duration: ms, easing: EASE, fill: 'both' });
+    let a;
+    if (dir === 0 || wide()) {            // tab change (or desktop): quick cross-fade
+      const sx = dir === 0 ? 0 : dir * 28;
+      snap.animate([{ opacity: 1 }, { opacity: 0 }], opt(180));
+      a = main.animate([{ opacity: 0, transform: 'translateX(' + sx + 'px)' }, { opacity: 1, transform: 'none' }], opt(220));
+    } else if (dir > 0) {                 // push: new page covers the old one, which backs off to the left
+      main.style.position = 'relative'; main.style.zIndex = '3'; main.style.background = 'var(--bg)'; main.style.boxShadow = '-8px 0 24px rgba(0,0,0,.10)';
+      snap.style.zIndex = '2';
+      snap.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateX(-28%)', opacity: .85 }], opt(300));
+      a = main.animate([{ transform: 'translateX(100%)' }, { transform: 'none' }], opt(300));
+    } else {                              // pop: old page slides off to the right, revealing the new one
+      main.style.position = 'relative'; main.style.zIndex = '2';
+      snap.style.zIndex = '4'; snap.style.background = 'var(--bg)'; snap.style.boxShadow = '-8px 0 24px rgba(0,0,0,.10)';
+      main.animate([{ transform: 'translateX(-28%)', opacity: .85 }, { transform: 'none', opacity: 1 }], opt(270));
+      a = snap.animate([{ transform: 'none' }, { transform: 'translateX(100%)' }], opt(270));
+    }
+    a.onfinish = a.oncancel = done;
+    setTimeout(done, 450);                // safety net
+  }
+  // swipe from the left edge to go back (phones)
+  (function () {
+    let x0 = 0, y0 = 0, on = false, dx = 0, lock = false;
+    const canBack = () => !wide() && !!(last.bar && JSON.parse(last.bar)[1]) && sheetEl.hidden && authEl.hidden;
+    root.addEventListener('touchstart', e => {
+      const t = e.touches[0]; on = false; dx = 0; lock = false;
+      if (t.clientX > 24 || !canBack() || reduceMotion()) return;
+      x0 = t.clientX; y0 = t.clientY; on = true;
+    }, { passive: true });
+    root.addEventListener('touchmove', e => {
+      if (!on) return;
+      const t = e.touches[0]; dx = t.clientX - x0;
+      if (!lock) { if (Math.abs(t.clientY - y0) > 12 && Math.abs(t.clientY - y0) > Math.abs(dx)) { on = false; return; } if (dx > 8) lock = true; else return; }
+      main.style.transition = 'none'; main.style.transform = 'translateX(' + Math.max(0, dx) + 'px)';
+      main.style.position = 'relative'; main.style.zIndex = '3'; main.style.background = 'var(--bg)'; main.style.boxShadow = '-8px 0 24px rgba(0,0,0,.10)';
+    }, { passive: true });
+    const end = () => {
+      if (!on || !lock) { on = false; return; }
+      on = false;
+      const W = root.clientWidth || 390, go = dx > W * 0.33;
+      main.style.transition = 'transform .24s ' + EASE;
+      main.style.transform = go ? 'translateX(' + W + 'px)' : 'none';
+      setTimeout(() => {
+        main.style.transition = ''; main.style.transform = ''; main.style.position = ''; main.style.zIndex = ''; main.style.background = ''; main.style.boxShadow = '';
+        if (go) { skipNext = true; act('back'); }
+      }, 250);
+    };
+    root.addEventListener('touchend', end); root.addEventListener('touchcancel', end);
+  })();
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
   /* ---------- messages from app.js ---------- */
@@ -177,6 +251,7 @@
     // body
     main.dataset.page = m.page || '';
     const pageChanged = m.page !== lastPage;
+    const trans = pageChanged ? snapOld(lastPage, m.page || '') : null;
     if (m.entry) {
       const k = JSON.stringify(m.entry);
       if (k !== last.entry || pageChanged || last.kind !== 'entry') { last.entry = k; last.kind = 'entry'; renderEntry(m.entry); }
@@ -188,11 +263,13 @@
       }
     } else if (last.kind) { last.kind = ''; main.textContent = ''; }
     last.kindPrev = last.kind;
-    if (pageChanged) { main.scrollTop = 0; lastPage = m.page; }
+    if (pageChanged) { main.scrollTop = 0; lastPage = m.page; runTrans(trans); }
 
     // form sheet
     if (sheetOn) {
       const k = JSON.stringify([m.form, m.sheet]);
+      const opening = sheetEl.hidden;
+      if (opening) { sheetEl.classList.add('enter'); setTimeout(() => sheetEl.classList.remove('enter'), 360); }
       if (k !== last.form) { last.form = k; renderSheet(m); }
       sheetEl.hidden = false;
     } else if (!sheetEl.hidden) { sheetEl.hidden = true; last.form = ''; sheetEl.textContent = ''; }

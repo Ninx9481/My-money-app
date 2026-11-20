@@ -3097,12 +3097,14 @@ if ('serviceWorker' in navigator) {
 
 /* ---------- Add page stays put (no scrolling); balance/summary header fades as you scroll (web version) ---------- */
 document.addEventListener('touchmove', e => {
-  if (ui.page === 'entry' && !e.target.closest('.sheet, input, textarea')) e.preventDefault();
+  if (document.body.classList.contains('webui') || document.body.classList.contains('native')) return;   // the web app's own screens scroll normally
+  if (document.body.dataset.page === 'entry' && !e.target.closest('.sheet, input, textarea')) e.preventDefault();
 }, { passive: false });
 window.addEventListener('scroll', () => {
   const hd = document.querySelector('.top');
-  if (NATIVE || !hd) return;
-  if (ui.page === 'balance' || ui.page === 'summary' || ui.page === 'subs' || ui.page === 'debts') {
+  const pg = document.body.dataset.page;
+  if (document.body.classList.contains('webui') || document.body.classList.contains('native') || !hd) return;
+  if (pg === 'balance' || pg === 'summary' || pg === 'subs' || pg === 'debts') {
     const y = Math.max(0, window.scrollY);
     hd.style.opacity = String(Math.max(0, 1 - y / 70));
     hd.style.filter = y > 1 ? 'blur(' + Math.min(10, y / 8).toFixed(1) + 'px)' : '';
