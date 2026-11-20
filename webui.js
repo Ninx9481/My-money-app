@@ -83,8 +83,27 @@
   const rail = h('aside', { class: 'w-rail' });
   root.append(topBar, pageHead, main, rail, tabBar, sheetEl, authEl, alertEl, toastEl);
   document.body.appendChild(root);
-  const send = (fn, kind, v) => { const c = $c(); if (c && c[fn]) c[fn](kind, v); };
-  const act = name => { const c = $c(); if (c) c.act(name); };
+  /* unsaved profile-name edit: ask before leaving the page */
+  let nameEdit = null;
+  const rawSend = (fn, kind, v) => { const c = $c(); if (c && c[fn]) c[fn](kind, v); };
+  const rawAct = name => { const c = $c(); if (c) c.act(name); };
+  function guarded(go) {
+    const e = nameEdit;
+    if (!e || !e.inp.isConnected) { nameEdit = null; return go(); }
+    if (e.inp.value.trim() === e.orig.trim()) { nameEdit = null; return go(); }
+    const th = isTh();
+    alertEl.textContent = '';
+    const close = () => { alertEl.hidden = true; };
+    const box = h('div', { class: 'w-alert', role: 'alertdialog' }, h('h3', { text: th ? 'บันทึกชื่อนี้ไหม?' : 'Save this name?' }),
+      h('p', { text: th ? 'คุณแก้ไขชื่อแล้วแต่ยังไม่ได้ยืนยัน' : 'You changed your name but haven’t confirmed it.' }),
+      h('div', { class: 'w-alert-btns wcol' },
+        h('button', { class: 'main', text: th ? 'ยืนยัน' : 'Confirm', onclick: () => { close(); e.commit(); nameEdit = null; go(); } }),
+        h('button', { class: 'bad', text: th ? 'ไม่บันทึก' : 'Discard', onclick: () => { close(); nameEdit = null; go(); } }),
+        h('button', { class: 'cancel', text: th ? 'แก้ไขต่อ' : 'Keep editing', onclick: () => { close(); e.inp.focus(); } })));
+    alertEl.appendChild(box); alertEl.hidden = false;
+  }
+  const send = (fn, kind, v) => { if (fn === 'screen' && kind === 'row' && v !== 'photo' && v !== 'rmphoto') return guarded(() => rawSend(fn, kind, v)); rawSend(fn, kind, v); };
+  const act = name => { if (name === 'sync') return rawAct(name); guarded(() => rawAct(name)); };
 
   const brand = h('div', { class: 'w-brand' }, h('span', { class: 'lg', text: 'L' }), h('div', null, h('b', { text: 'Lemoney' }), h('small', { text: 'Personal Wealth' })));
   tabBar.appendChild(brand);
@@ -635,13 +654,17 @@
         } }, svg('camera', false, 17)) : null;
         const nm = h('div', { class: 'nm' }, h('span', { text: r.name || '' }));
         if (r.editId) {
+          const show = () => { nm.textContent = ''; nm.append(h('span', { text: r.name || '' }), pen); nameEdit = null; };
           const pen = h('button', { class: 'w-pen', 'aria-label': L('Edit name'), onclick: () => {
             const inp = h('input', { class: 'w-nameinp', type: 'text', value: r.raw || '', placeholder: L('Your name'), maxlength: '40', enterkeyhint: 'done' });
-            let done = false;
-            const commit = ok => { if (done) return; done = true; if (ok) send('screen', 'field', { id: r.editId, v: inp.value }); else { nm.textContent = ''; nm.append(h('span', { text: r.name || '' }), pen); } };
-            inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(true); } else if (e.key === 'Escape') commit(false); });
-            inp.addEventListener('blur', () => commit(true));
-            nm.textContent = ''; nm.appendChild(inp); inp.focus(); inp.select();
+            const commit = () => { send('screen', 'field', { id: r.editId, v: inp.value }); };
+            const ok = h('button', { class: 'w-nameok', 'aria-label': L('Save'), onclick: commit }, svg('check', false, 18));
+            const no = h('button', { class: 'w-nameno', 'aria-label': L('Cancel'), onclick: show }, svg('x', false, 18));
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape') show(); });
+            nm.textContent = ''; nm.classList.add('editing');
+            nm.append(inp, ok, no);
+            nameEdit = { inp, orig: r.raw || '', commit };
+            inp.focus(); inp.select();
           } }, svg('pencil', false, 16));
           nm.appendChild(pen);
         }

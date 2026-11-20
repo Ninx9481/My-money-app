@@ -463,3 +463,16 @@ body.webui { margin: 0; background: var(--bg); color: var(--text); overflow: hid
 .w-pen:active { background: color-mix(in srgb, var(--text) 10%, transparent); }
 .w-av-badge { border: 0; padding: 0; cursor: pointer; }
 .w-nameinp { font: inherit; font-size: 22px; font-weight: 700; text-align: center; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); border: 0; border-radius: 12px; padding: 6px 12px; width: min(260px, 70vw); outline: 2px solid var(--trv); }
+
+/* name centred, pencil hangs off the right; edit mode has ✓ / ✕ */
+.w-avatar .nm { display: block; position: relative; max-width: 100%; padding: 0 4px; }
+.w-avatar .nm .w-pen { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 2px; }
+.w-avatar .nm.editing { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0; }
+.w-nameinp { width: min(220px, 56vw); }
+.w-nameok, .w-nameno { width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; -webkit-tap-highlight-color: transparent; }
+.w-nameok { background: var(--trv); color: #fff; }
+.w-nameno { background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--muted); }
+.w-avatar .nm.editing { display: block; position: relative; }
+.w-avatar .nm.editing .w-nameinp { display: block; margin: 0 auto; }
+.w-avatar .nm.editing .w-nameok { position: absolute; left: calc(50% + min(110px, 28vw) + 8px); top: 50%; transform: translateY(-50%); }
+.w-avatar .nm.editing .w-nameno { position: absolute; right: calc(50% + min(110px, 28vw) + 8px); top: 50%; transform: translateY(-50%); }
